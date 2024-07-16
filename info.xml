@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<extension key="me.sxs.square" type="module">
+  <file>square</file>
+  <name>me.sxs.square</name>
+  <description>FIXME</description>
+  <license>AGPL-3.0</license>
+  <maintainer>
+    <author>syxys1</author>
+    <email>github@sylvain-plante.me</email>
+  </maintainer>
+  <urls>
+    <url desc="Main Extension Page">http://FIXME</url>
+    <url desc="Documentation">http://FIXME</url>
+    <url desc="Support">http://FIXME</url>
+    <url desc="Licensing">http://www.gnu.org/licenses/agpl-3.0.html</url>
+  </urls>
+  <releaseDate>2024-06-18</releaseDate>
+  <version>1.0</version>
+  <develStage>alpha</develStage>
+  <compatibility>
+    <ver>5.73</ver>
+  </compatibility>
+  <comments>This is a new, undeveloped module</comments>
+  <classloader>
+    <psr0 prefix="CRM_" path="."/>
+    <psr4 prefix="Civi\" path="Civi"/>
+  </classloader>
+  <civix>
+    <namespace>CRM/Square</namespace>
+    <format>23.02.1</format>
+    <angularModule>crmSquare</angularModule>
+  </civix>
+  <mixins>
+    <mixin>mgd-php@1.0.0</mixin>
+    <mixin>setting-php@1.0.0</mixin>
+    <mixin>smarty-v2@1.0.1</mixin>
+  </mixins>
+</extension>
