@@ -6,7 +6,27 @@ use Civi\Payment\PropertyBag;
 class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     
   protected $_mode;
+  protected $_params = [];
   protected $_doDirectPaymentResult = [];
+
+  /**
+   * @var GuzzleHttp\Client
+   */
+  protected $guzzleClient;
+
+  /**
+   * @return \GuzzleHttp\Client
+   */
+  public function getGuzzleClient(): \GuzzleHttp\Client {
+    return $this->guzzleClient ?? new \GuzzleHttp\Client();
+  }
+
+  /**
+   * @param \GuzzleHttp\Client $guzzleClient
+   */
+  public function setGuzzleClient(\GuzzleHttp\Client $guzzleClient) {
+    $this->guzzleClient = $guzzleClient;
+  }
   
   /**
    * This support variable is used to allow the capabilities supported by the Dummy processor to be set from unit tests
@@ -186,70 +206,71 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
   public function doPayment(&$params, $component = 'contribute') {
-    Civi::log()->debug('Dummy.php::doPayment' . '  ' . $component);
+    Civi::log()->debug('squarePP.php::doPayment component' . '  ' . print_r($component, true));
+    Civi::log()->debug('squarePP.php::doPayment params' . '  ' . print_r($params, true));
     $this->_component = $component;
-    $statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
+    //$statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
 
-    $propertyBag = PropertyBag::cast($params);
-    if ((float) $propertyBag->getAmount() !== (float) $params['amount']) {
-      CRM_Core_Error::deprecatedWarning('amount should be passed through in machine-ready format');
-    }
-    // If we have a $0 amount, skip call to processor and set payment_status to Completed.
-    // Conceivably a processor might override this - perhaps for setting up a token - but we don't
-    // have an example of that at the mome.
-    if ($propertyBag->getAmount() == 0) {
-      $result['payment_status_id'] = array_search('Completed', $statuses);
-      $result['payment_status'] = 'Completed';
-      return $result;
-    }
+    // $propertyBag = PropertyBag::cast($params);
+    // if ((float) $propertyBag->getAmount() !== (float) $params['amount']) {
+    //   CRM_Core_Error::deprecatedWarning('amount should be passed through in machine-ready format');
+    // }
+    // // If we have a $0 amount, skip call to processor and set payment_status to Completed.
+    // // Conceivably a processor might override this - perhaps for setting up a token - but we don't
+    // // have an example of that at the mome.
+    // if ($propertyBag->getAmount() == 0) {
+    //   $result['payment_status_id'] = array_search('Completed', $statuses);
+    //   $result['payment_status'] = 'Completed';
+    //   return $result;
+    // }
 
     // Invoke hook_civicrm_paymentProcessor
     // In Dummy's case, there is no translation of parameters into
     // the back-end's canonical set of parameters.  But if a processor
     // does this, it needs to invoke this hook after it has done translation,
     // but before it actually starts talking to its proprietary back-end.
-    if ($propertyBag->getIsRecur()) {
-      $throwAnENoticeIfNotSetAsTheseAreRequired = $propertyBag->getRecurFrequencyInterval() . $propertyBag->getRecurFrequencyUnit();
-    }
+    // if ($propertyBag->getIsRecur()) {
+    //   $throwAnENoticeIfNotSetAsTheseAreRequired = $propertyBag->getRecurFrequencyInterval() . $propertyBag->getRecurFrequencyUnit();
+    // }
     // no translation in Dummy processor
-    CRM_Utils_Hook::alterPaymentProcessorParams($this, $params, $propertyBag);
-    // This means we can test failing transactions by setting a past year in expiry. A full expiry check would
-    // be more complete.
-    if (!empty($params['credit_card_exp_date']['Y']) && CRM_Utils_Time::date('Y') >
-      CRM_Core_Payment_Form::getCreditCardExpirationYear($params)) {
-      throw new PaymentProcessorException(ts('Invalid expiry date'));
-    }
+    // CRM_Utils_Hook::alterPaymentProcessorParams($this, $params, $propertyBag);
+    // // This means we can test failing transactions by setting a past year in expiry. A full expiry check would
+    // // be more complete.
+    // if (!empty($params['credit_card_exp_date']['Y']) && CRM_Utils_Time::date('Y') >
+    //   CRM_Core_Payment_Form::getCreditCardExpirationYear($params)) {
+    //   throw new PaymentProcessorException(ts('Invalid expiry date'));
+    // }
 
-    if (!empty($this->_doDirectPaymentResult)) {
-      $result = $this->_doDirectPaymentResult;
-      if (empty($result['payment_status_id'])) {
-        $result['payment_status_id'] = array_search('Pending', $statuses);
-        $result['payment_status'] = 'Pending';
-      }
-      if ($result['payment_status_id'] === 'failed') {
-        throw new PaymentProcessorException($result['message'] ?? 'failed');
-      }
-      $result['trxn_id'] = array_shift($this->_doDirectPaymentResult['trxn_id']);
-      return $result;
-    }
+    // if (!empty($this->_doDirectPaymentResult)) {
+    //   $result = $this->_doDirectPaymentResult;
+    //   if (empty($result['payment_status_id'])) {
+    //     $result['payment_status_id'] = array_search('Pending', $statuses);
+    //     $result['payment_status'] = 'Pending';
+    //   }
+    //   if ($result['payment_status_id'] === 'failed') {
+    //     throw new PaymentProcessorException($result['message'] ?? 'failed');
+    //   }
+    //   $result['trxn_id'] = array_shift($this->_doDirectPaymentResult['trxn_id']);
+    //   return $result;
+    // }
 
-    $result['trxn_id'] = $this->getTrxnID();
+    // $result['trxn_id'] = $this->getTrxnID();
 
-    // Add a fee_amount so we can make sure fees are handled properly in underlying classes.
-    $result['fee_amount'] = 1.50;
-    $result['description'] = $this->getPaymentDescription($params);
+    // // Add a fee_amount so we can make sure fees are handled properly in underlying classes.
+    // $result['fee_amount'] = 1.50;
+    // $result['description'] = $this->getPaymentDescription($params);
 
-    if (!isset($result['payment_status_id'])) {
-      if (!empty($propertyBag->getIsRecur())) {
-        // See comment block.
-        $result['payment_status_id'] = array_search('Pending', $statuses);
-        $result['payment_status'] = 'Pending';
-      }
-      else {
-        $result['payment_status_id'] = array_search('Completed', $statuses);
-        $result['payment_status'] = 'Completed';
-      }
-    }
+    // if (!isset($result['payment_status_id'])) {
+    //   if (!empty($propertyBag->getIsRecur())) {
+    //     // See comment block.
+    //     $result['payment_status_id'] = array_search('Pending', $statuses);
+    //     $result['payment_status'] = 'Pending';
+    //   }
+    //   else {
+    //     $result['payment_status_id'] = array_search('Completed', $statuses);
+    //     $result['payment_status'] = 'Completed';
+    //   }
+    // }
 
     return $result;
   }

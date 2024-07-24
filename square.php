@@ -5,6 +5,7 @@ require_once 'square.civix.php';
 use CRM_Square_ExtensionUtil as E;
 // phpcs:enable
 
+
 /**
  * Implements hook_civicrm_config().
  *
@@ -129,7 +130,7 @@ function square_civicrm_postinstall(): void {
     Civi::log()->debug('square.php::post_install hook payment processor type' . '  ' . print_r($paymentProcessorType, true));
     // do something
   }
-  
+
 }
 
 /**
@@ -158,8 +159,53 @@ function square_civicrm_postIPNProcess(&$IPNData) {
  */
 function square_civicrm_postProcess($formName, $form) {
   Civi::log()->debug('square.php::postProcess hook formName' . '  ' . print_r($formName, true));
-  Civi::log()->debug('square.php::postProcess hook form' . '  ' . print_r($form, true));
-  
-  
+  //Civi::log()->debug('square.php::postProcess hook form' . '  ' . print_r($form, true));  
 
+}
+
+
+/**
+ * Implements hook_civicrm_alterContent().
+ *
+ * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_alterContent
+ */
+function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
+  Civi::log()->debug('square.php::civicrm_alterContent Hook templateName' . '  ' . print_r($tplName, true));
+  Civi::log()->debug('squere.php::civicrm_alterContent Hook context' . '  ' . print_r($context, true));
+  
+  if($context == "form") {
+    if($tplName == "CRM/Event/Form/Registration/Confirm.tpl") {
+      $closuremethod = Closure::bind(function($object) {
+        return $object->_params;
+      }, null, get_class($object));
+      $lParams = $closuremethod($object);
+      Civi::log()->debug('square.php::civicrm_alterContent Hook lParams.0.InvoiceID' . '  ' . print_r( $lParams[0]["invoiceID"], true));
+  
+      //Civi::log()->debug('square.php::civicrm_alterContent Hook lParams.0.InvoiceID' . '  ' . print_r( $accessProtected ($object, "invoiceID"), true));
+  
+      $payInvoiceID = ts("Invoice ID") . ": " . $lParams[0]["invoiceID"];
+      $payContactID = ts("Client ID") . ": " . $lParams[0]["contact_id"];
+      $payAmount = ts("Total Amount") . ": " . $lParams[0]["amount"];
+      $payInstruction = ts("Please proceed to Square terminal and use these values to complete the transaction.");  
+      // Find the div element with id "continue_message-section"
+      $pattern = '/<\s*div\s*class\s*=\s*".*\Qcontinue_message-section\E.*"\s*>\X*?<\s*\/div\s*>/';
+      $replacement = '$0<br/><div>' . $payInstruction . '<br/>' . $payContactID . '<br/>' . $payInvoiceID . '</div>';
+      // Replace div element with pay_instruction 
+      $content = preg_replace ($pattern, $replacement, $content, 1); 
+      }
+    }
+  // }   
+}
+/**
+ * Implements Closure::bind to access protected properties.
+ * 
+ */
+{
+  $accessProtected = function & ($obj, $prop) {
+    $value = & Closure::bind(function & () use ($prop) {
+      return $this->$prop;
+    }, $obj, $obj)->__invoke();
+
+    return $value;
+  };
 }
