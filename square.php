@@ -12,7 +12,7 @@ use CRM_Square_ExtensionUtil as E;
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_config/
  */
 function square_civicrm_config(&$config): void {
-  Civi::log()->debug('square.php::civicrm_config hook config' . '  ');
+//  Civi::log()->debug('square.php::civicrm_config hook config' . '  ');
   _square_civix_civicrm_config($config);
 }
 

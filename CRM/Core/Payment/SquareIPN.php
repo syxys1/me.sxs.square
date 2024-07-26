@@ -19,6 +19,13 @@ use Civi\Api4\PaymentProcessor;
  * @copyright CiviCRM LLC https://civicrm.org/licensing
  */
 class CRM_Core_Payment_SquareIPN extends CRM_Core_Payment_BaseIPN {
+  
+  /**
+   * Input parameters from payment processor. Store these so that
+   * the code does not need to keep retrieving from the http request
+   * @var array
+   */
+  protected $_inputParameters = [];
 
   /**
    * Constructor function.
@@ -29,7 +36,7 @@ class CRM_Core_Payment_SquareIPN extends CRM_Core_Payment_BaseIPN {
    * @throws CRM_Core_Exception
    */
   public function __construct($inputData) {
-    Civi::log()->debug('SquareIPN.php::__Construct inputData' . '  ' . print_r($inputData, true));
+    //Civi::log()->debug('SquareIPN.php::__Construct inputData' . '  ' . print_r($inputData, true));
     
     $this->setInputParameters($inputData);
     parent::__construct();
@@ -46,6 +53,53 @@ class CRM_Core_Payment_SquareIPN extends CRM_Core_Payment_BaseIPN {
   protected $contributionStatus;
 
    /**
+   * @param string $name
+   * @param string $type
+   * @param bool $abort
+   *
+   * @return mixed
+   * @throws \CRM_Core_Exception
+   */
+  public function retrieve($name, $type, $abort = TRUE) {
+    $value = CRM_Utils_Type::validate(CRM_Utils_Array::value($name, $this->_inputParameters), $type, FALSE);
+    if ($abort && $value === NULL) {
+      throw new CRM_Core_Exception("SquareIPN: Could not find an entry for $name");
+    }
+    return $value;
+  }
+
+  /**
+   * @return mixed
+   * @throws \CRM_Core_Exception
+   */
+  protected function getTrxnType() {
+    return $this->retrieve('txn_type', 'String');
+  }
+
+   /**
+   * Get Contribution ID.
+   *
+   * @return int
+   *
+   * @throws \CRM_Core_Exception
+   */
+  protected function getContributionID(): int {
+    return (int) $this->retrieve('contributionID', 'Integer', TRUE);
+  }
+
+    /**
+   * Get contact id from parameters.
+   *
+   * @return int
+   *
+   * @throws \CRM_Core_Exception
+   */
+  protected function getContactID(): int {
+    return (int) $this->retrieve('contactID', 'Integer', TRUE);
+  }
+
+
+   /**
    * Main IPN processing function.
    */
   public function main() {
@@ -54,6 +108,8 @@ class CRM_Core_Payment_SquareIPN extends CRM_Core_Payment_BaseIPN {
       //for ARB we get x_subscription_id and x_subscription_paynum
       // @todo - no idea what the above comment means. The do-nothing line below
       // this is only still here as it might relate???
+      Civi::log()->debug('SquareIPN.php::main this' . '  ' . print_r($this, true));
+    
       $x_subscription_id = $this->getRecurProcessorID();
 
       if (!$this->isSuccess()) {

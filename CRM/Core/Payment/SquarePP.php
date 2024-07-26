@@ -1,11 +1,56 @@
 <?php
+/*
+ +----------------------------------------------------------------------------+
+ | Square In Person Merchant Extension Payment Module for CiviCRM version 5   |
+ +----------------------------------------------------------------------------+
+ | Licensed to CiviCRM under the Academic Free License version 3.0            |
+ |                                                                            |
+ | Based on work from Eileen McNaughton - Nov March 2008                      |
+ | Written by Sylvain Plante - July 2024                                      |
+ +----------------------------------------------------------------------------+
+ */
 
 use Civi\Payment\Exception\PaymentProcessorException;
-use Civi\Payment\PropertyBag;
+
+/**
+ * -----------------------------------------------------------------------------------------------
+ * TO BE EDITED 
+ * The basic functionality of this processor is that variables from the $params object are transformed
+ * into xml. The xml is submitted to the processor's https site
+ * using curl and the response is translated back into an array using the processor's function.
+ *
+ * If an array ($params) is returned to the calling function the values from
+ * the array are merged into the calling functions array.
+ *
+ * If an result of class error is returned it is treated as a failure. No error denotes a success. Be
+ * WARY of this when coding
+ *
+ * -----------------------------------------------------------------------------------------------
+ */
 
 class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     
+  /**
+   * Payment Processor Mode
+   *   either test or live
+   * @var string
+   */
   protected $_mode;
+
+   /**
+   * Constructor.
+   *
+   * @param string $mode
+   *   The mode of operation: live or test.
+   *
+   * @param array $paymentProcessor
+   */
+  public function __construct($mode, &$paymentProcessor) {
+    // live or test
+    $this->_mode = $mode;
+    $this->_paymentProcessor = $paymentProcessor;
+  }
+
   protected $_params = [];
   protected $_doDirectPaymentResult = [];
 
@@ -45,36 +90,6 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     'Refund' => FALSE,
   ];
   
-   /**
-   * Set result from do Direct Payment for test purposes.
-   *
-   * @param array $doDirectPaymentResult
-   *  Result to be returned from test.
-   */
-  public function setDoDirectPaymentResult($doDirectPaymentResult) {
-    Civi::log()->debug('Dummy.php::setDoDirectPaymentResult' . '  ' . $doDirectPaymentResult);
-    $this->_doDirectPaymentResult = $doDirectPaymentResult;
-    if (empty($this->_doDirectPaymentResult['trxn_id'])) {
-      $this->_doDirectPaymentResult['trxn_id'] = [];
-    }
-    else {
-      $this->_doDirectPaymentResult['trxn_id'] = (array) $doDirectPaymentResult['trxn_id'];
-    }
-  }
-
-  /**
-   * Constructor.
-   *
-   * @param string $mode
-   *   The mode of operation: live or test.
-   *
-   * @param array $paymentProcessor
-   */
-  public function __construct($mode, &$paymentProcessor) {
-    $this->_mode = $mode;
-    $this->_paymentProcessor = $paymentProcessor;
-  }
-
   /**
    * Does this payment processor support refund?
    *
@@ -195,7 +210,69 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     $this->supports = array_merge($this->supports, $support);
   }
 
-    /**
+  /**
+   * Map fields to parameters. To be edited
+   *
+   * This function is set up and put here to make the mapping of fields
+   * from the params object  as visually clear as possible for easy editing
+   *
+   * @param array $params
+   *
+   * @return array
+   */
+  public function mapProcessorFieldstoParams($params) {
+    $requestFields['ssl_first_name'] = $params['billing_first_name'];
+    $requestFields['ssl_last_name'] = $params['billing_last_name'];
+    // contact name
+    $requestFields['ssl_ship_to_first_name'] = $params['first_name'];
+    // contact name
+    $requestFields['ssl_ship_to_last_name'] = $params['last_name'];
+    $requestFields['ssl_card_number'] = $params['credit_card_number'];
+    $requestFields['ssl_amount'] = trim($params['amount']);
+    $requestFields['ssl_exp_date'] = sprintf('%02d', (int) $params['month']) . substr($params['year'], 2, 2);
+    $requestFields['ssl_cvv2cvc2'] = $params['cvv2'];
+    // CVV field passed to processor
+    $requestFields['ssl_cvv2cvc2_indicator'] = "1";
+    $requestFields['ssl_avs_address'] = $params['street_address'];
+    $requestFields['ssl_city'] = $params['city'];
+    $requestFields['ssl_state'] = $params['state_province'];
+    $requestFields['ssl_avs_zip'] = $params['postal_code'];
+    $requestFields['ssl_country'] = $params['country'];
+    $requestFields['ssl_email'] = $params['email'];
+    // 32 character string
+    $requestFields['ssl_invoice_number'] = $params['invoiceID'];
+    $requestFields['ssl_transaction_type'] = "CCSALE";
+    $requestFields['ssl_description'] = empty($params['description']) ? "backoffice payment" : $params['description'];
+    $requestFields['ssl_customer_number'] = substr($params['credit_card_number'], -4);
+    // Added two lines below to allow commercial cards to go through as per page 15 of Elavon developer guide
+    $requestFields['ssl_customer_code'] = '1111';
+    $requestFields['ssl_salestax'] = 0.0;
+    $requestFields['ssl_cardholder_ip'] = CRM_Utils_System::ipAddress();
+    return $requestFields;
+  }
+
+   /**
+   * Set result from do Direct Payment for test purposes.
+   *
+   * @param array $doDirectPaymentResult
+   *  Result to be returned from test.
+   */
+  public function setDoDirectPaymentResult($doDirectPaymentResult) {
+    Civi::log()->debug('Dummy.php::setDoDirectPaymentResult' . '  ' . $doDirectPaymentResult);
+    $this->_doDirectPaymentResult = $doDirectPaymentResult;
+    if (empty($this->_doDirectPaymentResult['trxn_id'])) {
+      $this->_doDirectPaymentResult['trxn_id'] = [];
+    }
+    else {
+      $this->_doDirectPaymentResult['trxn_id'] = (array) $doDirectPaymentResult['trxn_id'];
+    }
+  }
+
+
+  /**
+   * 
+   * This function sends request to the processor or display info for manual process.
+   *
    * @param array|PropertyBag $params
    *
    * @param string $component
@@ -208,38 +285,68 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
   public function doPayment(&$params, $component = 'contribute') {
     Civi::log()->debug('squarePP.php::doPayment component' . '  ' . print_r($component, true));
     Civi::log()->debug('squarePP.php::doPayment params' . '  ' . print_r($params, true));
+    
+    $propertyBag = \Civi\Payment\PropertyBag::cast($params);
     $this->_component = $component;
-    //$statuses = CRM_Contribute_BAO_Contribution::buildOptions('contribution_status_id', 'validate');
+    $result = $this->setStatusPaymentPending([]);
 
-    // $propertyBag = PropertyBag::cast($params);
-    // if ((float) $propertyBag->getAmount() !== (float) $params['amount']) {
-    //   CRM_Core_Error::deprecatedWarning('amount should be passed through in machine-ready format');
-    // }
-    // // If we have a $0 amount, skip call to processor and set payment_status to Completed.
-    // // Conceivably a processor might override this - perhaps for setting up a token - but we don't
-    // // have an example of that at the mome.
-    // if ($propertyBag->getAmount() == 0) {
-    //   $result['payment_status_id'] = array_search('Completed', $statuses);
-    //   $result['payment_status'] = 'Completed';
-    //   return $result;
-    // }
+    // If we have a $0 amount, skip call to processor and set payment_status to Completed.
+    // Conceivably a processor might override this - perhaps for setting up a token - but we don't
+    // have an example of that at the moment.
+    //  $result['payment_status_id'] = array_search('Completed', $statuses);
+    //  $result['payment_status'] = 'Completed';
+    if ($propertyBag->getAmount() == 0) {
+      $result = $this->setStatusPaymentCompleted($result);
+      return $result;
+    }
+
+    if (isset($params['is_recur']) && $params['is_recur'] == TRUE) {
+      throw new CRM_Core_Exception(ts('Square - recurring payments not implemented'));
+    }
+
+    //Create the array of variables to be sent to the processor from the $params array
+    // passed into this function
+    $requestFields = $this->mapProcessorFieldstoParams($params);
+
+    // define variables for connecting with the gateway
+    $requestFields['ssl_merchant_id'] = $this->_paymentProcessor['user_name'];
+    $requestFields['ssl_user_id'] = $this->_paymentProcessor['password'] ?? NULL;
+    $requestFields['ssl_pin'] = $this->_paymentProcessor['signature'] ?? NULL;
+    $host = $this->_paymentProcessor['url_site'];
+
+    if ($this->_mode === 'test') {
+      $requestFields['ssl_test_mode'] = "TRUE";
+    }
 
     // Invoke hook_civicrm_paymentProcessor
-    // In Dummy's case, there is no translation of parameters into
-    // the back-end's canonical set of parameters.  But if a processor
-    // does this, it needs to invoke this hook after it has done translation,
+    // It needs to invoke this hook after it has done translation,
     // but before it actually starts talking to its proprietary back-end.
-    // if ($propertyBag->getIsRecur()) {
-    //   $throwAnENoticeIfNotSetAsTheseAreRequired = $propertyBag->getRecurFrequencyInterval() . $propertyBag->getRecurFrequencyUnit();
-    // }
-    // no translation in Dummy processor
-    // CRM_Utils_Hook::alterPaymentProcessorParams($this, $params, $propertyBag);
-    // // This means we can test failing transactions by setting a past year in expiry. A full expiry check would
-    // // be more complete.
-    // if (!empty($params['credit_card_exp_date']['Y']) && CRM_Utils_Time::date('Y') >
-    //   CRM_Core_Payment_Form::getCreditCardExpirationYear($params)) {
-    //   throw new PaymentProcessorException(ts('Invalid expiry date'));
-    // }
+    CRM_Utils_Hook::alterPaymentProcessorParams($this, $params, $requestFields);
+
+    // Check to see if we have a duplicate before we send
+    if ($this->checkDupe($params['invoiceID'], CRM_Utils_Array::value('contributionID', $params))) {
+      throw new PaymentProcessorException(ts('It appears that this transaction is a duplicate.  Have you already submitted the form once?  If so there may have been a connection problem.  Check your email for a receipt.  If you do not receive a receipt within 2 hours you can try your transaction again.  If you continue to have problems please contact the site administrator.'), 9003);
+    }
+    /* 
+     // Convert to XML using function below
+     $xml = $this->buildXML($requestFields);
+
+     // Send to the payment processor using cURL
+ 
+     $chHost = $host . '?xmldata=' . $xml;
+     $curlParams = [
+       CURLOPT_RETURNTRANSFER => TRUE,
+       CURLOPT_TIMEOUT => 36000,
+       CURLOPT_SSL_VERIFYHOST => Civi::settings()->get('verifySSL') ? 2 : 0,
+       CURLOPT_SSL_VERIFYPEER => Civi::settings()->get('verifySSL'),
+     ];
+     if (ini_get('open_basedir') == '') {
+       $curlParams[CURLOPT_FOLLOWLOCATION] = 1;
+     }
+     $responseData = $this->getGuzzleClient()->post($chHost, [
+       'curl' => $curlParams,
+     ])->getBody();
+     */
 
     // if (!empty($this->_doDirectPaymentResult)) {
     //   $result = $this->_doDirectPaymentResult;
@@ -277,29 +384,195 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
 
 
   public function handlePaymentNotification() {
-    Civi::log()->debug('SquarePP.php::handlePaymentNotification' . '  ');
+    Civi::log()->debug('SquarePP.php::handlePaymentNotification');
         
     $rawData = file_get_contents("php://input");
-    Civi::log()->debug('SquarePP.php::handlePaymentNotification rawDate' . '  ' . print_r($rawData, true));
+    //Civi::log()->debug('SquarePP.php::handlePaymentNotification rawData' . '  ' . print_r($rawData, true));
     $rawData = json_decode($rawData, true);
+    //Civi::log()->debug('SquarePP.php::handlePaymentNotification rawData after json_decode' . '  ' . print_r($rawData, true));
     $ipnClass = new CRM_Core_Payment_SquareIPN($rawData);
     Civi::log()->debug('SquarePP.php::handlePaymentNotification ipnClass' . '  ' . print_r($ipnClass, true));
+
+    
+    Civi::log()->debug('SquarePP.php::handlePaymentNotification $rawData merchant_id' . '  ' . print_r($rawData["merchant_id"], true));
+    Civi::log()->debug('SquarePP.php::handlePaymentNotification $rawData event_id' . '  ' . print_r($rawData["event_id"], true));
+    Civi::log()->debug('SquarePP.php::handlePaymentNotification $rawData created_at' . '  ' . print_r($rawData["created_at"], true));
+    Civi::log()->debug('SquarePP.php::handlePaymentNotification switch $rawData type' . '  ' . print_r($rawData["type"], true));
+    $subData = $rawData["data"];
+
+    switch ($rawData["type"]) {
+      case "payment.created":
+      case "payment.updated":
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification payment.created');
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification payment.updated');
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $rawData data' . '  ' . print_r($rawData["data"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $subData type' . '  ' . print_r($subData["type"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $subData id' . '  ' . print_r($subData["id"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $subData object' . '  ' . print_r($subData["object"], true));
+        $payData = $subData["object"]["payment"];
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData amount_money' . '  ' . print_r($payData["amount_money"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData application_details' . '  ' . print_r($payData["application_details"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData approved_money' . '  ' . print_r($payData["approved_money"], true));
+        //Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData capabilities' . '  ' . print_r($payData["capabilities"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData card_details' . '  ' . print_r($payData["card_details"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData created_at' . '  ' . print_r($payData["created_at"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData customer_id' . '  ' . print_r($payData["customer_id"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData id' . '  ' . print_r($payData["id"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData location_id' . '  ' . print_r($payData["location_id"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData order_id' . '  ' . print_r($payData["order_id"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData receipt_number' . '  ' . print_r($payData["receipt_number"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData reference_id' . '  ' . print_r($payData["reference_id"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData source_type' . '  ' . print_r($payData["source_type"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData status' . '  ' . print_r($payData["status"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData total_money' . '  ' . print_r($payData["total_money"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData updated_at' . '  ' . print_r($payData["updated_at"], true));
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData version' . '  ' . print_r($payData["version"], true));
+        
+        switch ($payData["status"]) {
+          case "APPROVED":
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData status APPROVED - wait for completed');
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData status' . '  ' . print_r($payData["status"], true));
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData version' . '  ' . print_r($payData["version"], true));
+            break;
+          case "COMPLETED":
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData status COMPLETED');
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData status' . '  ' . print_r($payData["status"], true));
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData version' . '  ' . print_r($payData["version"], true));
+            
+            $cardData = $payData["card_details"];
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification $cardData' . '  ' . print_r($cardData, true));
+
+            if ($this->_mode === 'test') {
+              $query = "SELECT MAX(trxn_id) FROM civicrm_contribution WHERE trxn_id LIKE 'test%'";
+              $trxn_id = (string) CRM_Core_DAO::singleValueQuery($query);
+              $trxn_id = (int) str_replace('test', '', $trxn_id);
+              ++$trxn_id;
+              $result['trxn_id'] = sprintf('test%08d', $trxn_id);
+              return $result;
+            }
+              //throw new PaymentProcessorException('Error: [approval code related to test transaction but mode was ' . $this->_mode, 9099);
+            else {
+              $result['trxn_id'] = $payData['id'];
+              Civi::log()->debug('SquarePP.php::handlePaymentNotification $payData id' . '  ' . print_r($payData['id'], true));
+              $params['trxn_result_code'] = $cardData['card']['bin'] . "-Cvv2:" . $cardData['cvv_status'] . "-avs:" . $cardData['avs_status'];
+              Civi::log()->debug('SquarePP.php::handlePaymentNotification $params' . '  ' . print_r($params, true));
+              
+              $contributions = \Civi\Api4\Contribution::get(FALSE)
+                ->addSelect('RIGHT(invoice_id, 4) AS invoice_id_last4', 'id', 'contact_id', 'payment_instrument_id', 'total_amount', 'invoice_id', 'trxn_id', 'financial_type_id', 'receive_date', 'currency', 'contribution_status_id', 'paid_amount', 'balance_amount')
+                ->addWhere('contribution_status_id', '=', 2)
+                //->addWhere('contact_id', '=', $payData["customer_id"])
+                ->addWhere('balance_amount', '>', 0)
+                ->setHaving([['invoice_id_last4', 'LIKE', $payData["reference_id"]]])
+                ->execute();
+              Civi::log()->debug('SquarePP.php::handlePaymentNotification $contributions' . '  ' . print_r($contributions, true));
+              
+              foreach ($contributions as $contribution) {
+                Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution id' . '  ' . print_r($contribution["id"], true));
+                if (strcasecmp($contribution["contact_id"], $payData["customer_id"]) <> 0) {
+                  Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution contact_id' . ' ' .
+                    print_r($contribution["contact_id"], true) . ' is different from payee id ' . print_r($payData["customer_id"], true));
+                }
+                if (strcasecmp($contribution["currency"], $payData["amount_money"]["currency"]) <> 0) {
+                  Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution currency' . '  ' . 
+                    print_r($contribution["currency"], true) . '  is different from payee currency ( not supported ) : ' . 
+                    print_r($payData["amount_money"]["currency"], true));
+                  return $result = null;
+                }
+
+                $x = ((int)$payData["amount_money"]["amount"] / 100) - (int)$contribution["balance_amount"];
+                Civi::log()->debug('SquarePP.php::handlePaymentNotification x' . '  ' . print_r($x, true));
+                Civi::log()->debug('SquarePP.php::handlePaymentNotification payData' . '  ' . print_r((int)$payData["amount_money"]["amount"] / 100, true));
+                Civi::log()->debug('SquarePP.php::handlePaymentNotification contribution' . '  ' . print_r((int)$contribution["balance_amount"], true));
+                   
+                switch (true) {
+                  case $x == 0:
+                    $contribution["contribution_status_id"] = 1;
+                    $contribution["trxn_id"] = $payData['id'];
+                    Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution trxn_id' . '  ' . print_r($contribution["trxn_id"], true));
+                    break;
+                  case $x < 0:
+                    Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution balance amount' . '  ' . 
+                      print_r($contribution["balance_amount"], true) . '  is greater then payee amount ( still a balance ) : ' . 
+                      print_r(((int)$payData["amount_money"]["amount"] / 100), true));
+                    break;
+                  case $x > 0;
+                    Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution balance amount' . '  ' . 
+                      print_r($contribution["balance_amount"], true) . '  is less then payee amount ( not supported ) : ' . 
+                      print_r(((int)$payData["amount_money"]["amount"] / 100), true));
+                    return $result = null;
+                    break;
+                }
+            
+                $results = \Civi\Api4\Contribution::update(FALSE)
+                  //->addValue('payment_instrument_id', '')
+                  ->addValue('paid_amount', ((int)$payData["amount_money"]["amount"] / 100))
+                  ->addValue('trxn_id', $contribution["trxn_id"])
+                  ->addValue('contribution_status_id', $contribution["contribution_status_id"])
+                  ->addWhere('id', '=', $contribution["id"])
+                  ->execute();
+                foreach ($results as $result) {
+                  Civi::log()->debug('SquarePP.php::handlePaymentNotification $contribution update result' . '  ' . print_r($result, true));
+                    // do something
+                }
+                // do something
+              }
+                            
+              $result = $this->setStatusPaymentCompleted($result);
+              Civi::log()->debug('SquarePP.php::handlePaymentNotification $result' . '  ' . print_r($result, true));
+              return $result;
+            }
+            break;
+          default:
+            Civi::log()->debug('SquarePP.php::handlePaymentNotification other status' . ' ' . print_r($payData["status"], true));
+        }
+        break;
+      case "order.created":
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification order.created');
+        break;
+      case "order.updated":
+        Civi::log()->debug('SquarePP.php::handlePaymentNotification order.updated');
+        break;
+      default:
+      Civi::log()->debug('SquarePP.php::handlePaymentNotification undefined response');
+    }
+    
+    
+    
+    
+    
     if ($ipnClass->onReceiveWebhook()) {
       http_response_code(200);
       Civi::log()->debug('SquarePP.php::handlePaymentNotification ipnClass ReceiveWebhook' . '  ' . print_r($ipnClass->onReceiveWebhook(), true));
     }
   }
 
-   /**
-   * This function checks to see if we have the right config values.
+  /**
+   * This public function checks to see if we have the right processor config values set.
    *
-   * @return string
-   *   the error message if any
+   * NOTE: Called by Events and Contribute to check config params are set prior to trying
+   *  register any credit card details
+   *
+   * @return string|null
+   *   $errorMsg if any errors found - null if OK
+   *
    */
   public function checkConfig() {
+    $errorMsg = [];
+
+    if (empty($this->_paymentProcessor['user_name'])) {
+      $errorMsg[] = ' ' . ts('ssl_merchant_id is not set for this payment processor');
+    }
+
+    if (empty($this->_paymentProcessor['url_site'])) {
+      $errorMsg[] = ' ' . ts('URL is not set for this payment processor');
+    }
+
+    if (!empty($errorMsg)) {
+      return implode('<p>', $errorMsg);
+    }
     return NULL;
   }
-
+  
 
 
 }
