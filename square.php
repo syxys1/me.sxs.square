@@ -1,13 +1,12 @@
 <?php
 
 require_once 'square.civix.php';
-/* require_once 'vendor/autoload.php';
+require_once 'vendor/autoload.php';
 
 use Square\SquareClientBuilder;
 use Square\Authentication\BearerAuthCredentialsBuilder;
 use Square\Environment;
 use Square\Exceptions\ApiException;
- */
 
 // phpcs:disable
 use CRM_Square_ExtensionUtil as E;
@@ -84,10 +83,14 @@ function square_civicrm_managed(&$entities): void {
 function square_civicrm_postinstall(): void {
   Civi::log()->debug('square.php::civicrm_postinstall hook');
 
- /*  # The URL that this server is listening on (e.g., 'http://example.com/events')
+  # The URL that this server is listening on (e.g., 'http://example.com/events')
   # Note that to receive notifications from Square, this cannot be a localhost URL
   # TODO MUST change to get Payment Processor ID from code
   $webhookUrlLocal = 'civicrm/payment/ipn/32/';
+
+  # Currently, the SQUARE_ACCESS_ TOKEN is set 
+  # in /etc/nginx/fastcgi.config
+  # TODO MUST change to get it from Payment Processor config from code
 
   $domain = CRM_Utils_System::baseURL();
   Civi::log()->debug('square.php::civicrm_postinstall hook domain ' . print_r($domain,true));
@@ -138,7 +141,7 @@ function square_civicrm_postinstall(): void {
     Civi::log()->debug('square.php::civicrm_postinstall errors ApiException occurred: ' . 
       print_r($e->getMessage(), true));
   };
- */
+
   // Check if a financial account "Square Account" exist.
   // If not, create it.
   $financial_accounts = \Civi\Api4\FinancialAccount::save(TRUE)
