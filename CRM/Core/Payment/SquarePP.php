@@ -83,7 +83,7 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     'MultipleConcurrentPayments' => FALSE,
     'EditRecurringContribution' => FALSE,
     'CancelRecurringNotifyOptional' => FALSE,
-    'BackOffice' => FALSE,
+    'BackOffice' => TRUE,
     'NoEmailProvided' => FALSE,
     'CancelRecurring' => FALSE,
     'FutureRecurStartDate' => FALSE,
@@ -258,7 +258,7 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
    *  Result to be returned from test.
    */
   public function setDoDirectPaymentResult($doDirectPaymentResult) {
-    Civi::log()->debug('Dummy.php::setDoDirectPaymentResult' . '  ' . $doDirectPaymentResult);
+    Civi::log()->debug('SuarePP.php::setDoDirectPaymentResult' . '  ' . $doDirectPaymentResult);
     $this->_doDirectPaymentResult = $doDirectPaymentResult;
     if (empty($this->_doDirectPaymentResult['trxn_id'])) {
       $this->_doDirectPaymentResult['trxn_id'] = [];

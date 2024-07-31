@@ -1,6 +1,14 @@
 <?php
 
 require_once 'square.civix.php';
+/* require_once 'vendor/autoload.php';
+
+use Square\SquareClientBuilder;
+use Square\Authentication\BearerAuthCredentialsBuilder;
+use Square\Environment;
+use Square\Exceptions\ApiException;
+ */
+
 // phpcs:disable
 use CRM_Square_ExtensionUtil as E;
 // phpcs:enable
@@ -12,7 +20,7 @@ use CRM_Square_ExtensionUtil as E;
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_config/
  */
 function square_civicrm_config(&$config): void {
-//  Civi::log()->debug('square.php::civicrm_config hook config' . '  ');
+  
   _square_civix_civicrm_config($config);
 }
 
@@ -32,8 +40,27 @@ function square_civicrm_install(): void {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_enable
  */
 function square_civicrm_enable(): void {
-  Civi::log()->debug('square.php::civicrm_enable hook' . '  ');
+  Civi::log()->debug('square.php::civicrm_enable hook');
   _square_civix_civicrm_enable();
+}
+
+/**
+ * Implements hook_civicrm_check().
+ * 
+ * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_check
+ */
+function square_civicrm_check(&$messages) {
+  Civi::log()->debug('square.php::civicrm_check hook messages' . '  ' . print_r($messages,true));
+  
+  if (!class_exists('SoapClient')) {
+    $messages[] = new CRM_Utils_Check_Message(
+      'iats_soap',
+      ts('The SOAP extension for PHP %1 is not installed on this server, but is required for this extension.', array(1 => phpversion())),
+      ts('iATS Payments Installation'),
+      \Psr\Log\LogLevel::CRITICAL,
+      'fa-flag'
+    );
+  }
 }
 
 /**
@@ -55,8 +82,63 @@ function square_civicrm_managed(&$entities): void {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_postinstall
  */
 function square_civicrm_postinstall(): void {
-  Civi::log()->debug('square.php::civicrm_postinstall');
+  Civi::log()->debug('square.php::civicrm_postinstall hook');
 
+ /*  # The URL that this server is listening on (e.g., 'http://example.com/events')
+  # Note that to receive notifications from Square, this cannot be a localhost URL
+  # TODO MUST change to get Payment Processor ID from code
+  $webhookUrlLocal = 'civicrm/payment/ipn/32/';
+
+  $domain = CRM_Utils_System::baseURL();
+  Civi::log()->debug('square.php::civicrm_postinstall hook domain ' . print_r($domain,true));
+   
+  $client = SquareClientBuilder::init()
+    ->bearerAuthCredentials(
+      BearerAuthCredentialsBuilder::init(
+        getenv('SQUARE_ACCESS_TOKEN')
+      )
+  )
+  ->environment(Environment::SANDBOX)
+  ->build(); 
+  
+  try {
+    $api_response = $client->getWebhookSubscriptionsApi()->listWebhookSubscriptions();
+      
+    if ($api_response->isSuccess()) {
+        $result = $api_response->getResult();
+        Civi::log()->debug('square.php::civicrm_postinstall result ' . print_r($result,true));
+
+        $subscriptions = array();
+        $subscriptions = $result->getSubscriptions();
+        Civi::log()->debug('square.php::civicrm_postinstall subscriptions ' . print_r($subscriptions,true));
+        
+        $webhookUrl = $domain . $webhookUrlLocal;
+        Civi::log()->debug('square.php::civicrm_postinstall webhookUrl ' . print_r($webhookUrl,true));
+      
+        $found = 0;
+        foreach ($subscriptions as $var) {
+          Civi::log()->debug('square.php::civicrm_postinstall subscription id: ' . print_r($var->getId(), true));
+          Civi::log()->debug('square.php::civicrm_postinstall subscription name: ' . print_r($var->getName(), true));
+          Civi::log()->debug('square.php::civicrm_postinstall subscription notification_url: ' . print_r($var->getNotificationUrl(), true));
+          $found += $var->getNotificationUrl() == $webhookUrl ? 1 : 0;
+        }
+      
+        Civi::log()->debug('square.php::civicrm_postinstall subscriptions compareUrl ' . print_r($found,true));
+
+    } else {
+        $errors = $apiResponse->getErrors();
+        foreach ($errors as $error) {
+          Civi::log()->debug('square.php::civicrm_postinstall errors ' . 
+            print_r($error->getCategory(), true) . ' ' . 
+            print_r($error->getCode(), true) . ' ' .
+            print_r($error->getDetail(), true));
+        }
+    }
+  } catch (ApiException $e) {
+    Civi::log()->debug('square.php::civicrm_postinstall errors ApiException occurred: ' . 
+      print_r($e->getMessage(), true));
+  };
+ */
   // Check if a financial account "Square Account" exist.
   // If not, create it.
   $financial_accounts = \Civi\Api4\FinancialAccount::save(TRUE)
@@ -193,8 +275,13 @@ function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
       // Replace div element with pay_instruction 
       $content = preg_replace ($pattern, $replacement, $content, 1); 
       }
+    else {
+      if($tplName == "CRM/Financial/Form/Payment.tpl") {
+        Civi::log()->debug('squere.php::civicrm_alterContent Hook $content' . '  ' . print_r($content, true));
+  
+      }
     }
-  // }   
+  }   
 }
 /**
  * Implements Closure::bind to access protected properties.
@@ -208,4 +295,49 @@ function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
 
     return $value;
   };
+}
+/**
+ * Utility function to get domain info.
+ *
+ * Get values from the civicrm_domain table, or a domain setting.
+ */
+function _square_civicrm_domain_info($key) {
+  static $domain, $settings;
+  if (empty($domain)) {
+    $domain = civicrm_api3('Domain', 'getsingle', array('current_domain' => TRUE));
+  }
+  Civi::log()->debug('square.php::_square_civicrm_domain_info domain ' . print_r($domain,true));
+  if (!isset($settings)) {
+    $settings = array();
+  }
+  switch ($key) {
+    case 'version':
+      return explode('.', $domain['version']);
+
+    default:
+      if (isset($domain[$key])) {
+        return $domain[$key];
+      }
+      elseif (isset($settings[$key])) {
+        return $settings[$key];
+      }
+      else {
+        try{
+          $setting = civicrm_api3('Setting', 'getvalue', array('name' => $key));
+          if (is_string($setting)) {
+            $settings[$key] = $setting;
+            return $setting;
+          }
+        }
+        catch (CiviCRM_API3_Exception $e) {
+          // ignore errors
+        }
+      }
+      // Uncomment one or more of these lines to find out what it was we were looking for and didn't find.
+      Civi::log()->debug('Square.php::civicrm_domain_info' . ' ' . print_r('domain ' . $domain, true));
+      Civi::log()->debug('Square.php::civicrm_domain_info' . ' ' . print_r('key ' . $key, true));
+      Civi::log()->debug('Square.php::civicrm_domain_info' . ' ' . print_r('setting ' . $setting, true));
+      Civi::log()->debug('Square.php::civicrm_domain_info' . ' ' . print_r('settings ' . $settings, true));
+      
+  }
 }
