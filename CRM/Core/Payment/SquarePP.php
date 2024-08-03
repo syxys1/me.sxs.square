@@ -10,6 +10,7 @@
  +----------------------------------------------------------------------------+
  */
 
+//require_once __DIR__.'/CRM/square/squareUtils.php';
 use Civi\Payment\Exception\PaymentProcessorException;
 
 /**
@@ -221,33 +222,33 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
    * @return array
    */
   public function mapProcessorFieldstoParams($params) {
-    $requestFields['ssl_first_name'] = $params['billing_first_name'];
-    $requestFields['ssl_last_name'] = $params['billing_last_name'];
-    // contact name
-    $requestFields['ssl_ship_to_first_name'] = $params['first_name'];
-    // contact name
-    $requestFields['ssl_ship_to_last_name'] = $params['last_name'];
-    $requestFields['ssl_card_number'] = $params['credit_card_number'];
-    $requestFields['ssl_amount'] = trim($params['amount']);
-    $requestFields['ssl_exp_date'] = sprintf('%02d', (int) $params['month']) . substr($params['year'], 2, 2);
-    $requestFields['ssl_cvv2cvc2'] = $params['cvv2'];
-    // CVV field passed to processor
-    $requestFields['ssl_cvv2cvc2_indicator'] = "1";
-    $requestFields['ssl_avs_address'] = $params['street_address'];
-    $requestFields['ssl_city'] = $params['city'];
-    $requestFields['ssl_state'] = $params['state_province'];
-    $requestFields['ssl_avs_zip'] = $params['postal_code'];
-    $requestFields['ssl_country'] = $params['country'];
-    $requestFields['ssl_email'] = $params['email'];
+
+    //$requestFields['a'] = $params['billing_first_name'];
+    //$requestFields['b'] = $params['billing_last_name'];
+    $requestFields['c'] = $params['first_name'];
+    $requestFields['d'] = $params['last_name'];
     // 32 character string
-    $requestFields['ssl_invoice_number'] = $params['invoiceID'];
-    $requestFields['ssl_transaction_type'] = "CCSALE";
-    $requestFields['ssl_description'] = empty($params['description']) ? "backoffice payment" : $params['description'];
-    $requestFields['ssl_customer_number'] = substr($params['credit_card_number'], -4);
-    // Added two lines below to allow commercial cards to go through as per page 15 of Elavon developer guide
-    $requestFields['ssl_customer_code'] = '1111';
-    $requestFields['ssl_salestax'] = 0.0;
-    $requestFields['ssl_cardholder_ip'] = CRM_Utils_System::ipAddress();
+    $requestFields['base_price_amount'] = (int)trim($params['amount']) * 100;
+    $requestFields['base_price_currency'] = $params['currencyID'];
+    $requestFields['applied_tax_amount'] = (int)trim($params['tax_amount']) * 100;
+    $requestFields['line_item_uid'] = $params['invoiceID'];
+    $requestFields['line_item_note'] = $params['description'];
+    $requestFields['line_item_name'] = $params['amount_level'];
+    $requestFields['line_item_type'] = 'CUSTOM_AMOUNT';
+    $requestFields['line_item_qty'] = 1;
+    $requestFields['line_item_tax'] = 'TPS';
+    $requestFields['line_item_tax1'] = 'TVQ';
+    
+    $requestFields['reference_id'] = $params['contributionID'];
+    $requestFields['customer_id'] = $params['contact_id'];
+    $requestFields['ticket_name'] = $params['email-Primary'];
+    
+    //$requestFields['e'] = $params['street_address'];
+    //$requestFields['f'] = $params['city'];
+    //$requestFields['g'] = $params['state_province'];
+    //$requestFields['h'] = $params['postal_code'];
+    //$requestFields['i'] = $params['country'];
+    
     return $requestFields;
   }
 
@@ -307,17 +308,7 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     //Create the array of variables to be sent to the processor from the $params array
     // passed into this function
     $requestFields = $this->mapProcessorFieldstoParams($params);
-
-    // define variables for connecting with the gateway
-    $requestFields['ssl_merchant_id'] = $this->_paymentProcessor['user_name'];
-    $requestFields['ssl_user_id'] = $this->_paymentProcessor['password'] ?? NULL;
-    $requestFields['ssl_pin'] = $this->_paymentProcessor['signature'] ?? NULL;
-    $host = $this->_paymentProcessor['url_site'];
-
-    if ($this->_mode === 'test') {
-      $requestFields['ssl_test_mode'] = "TRUE";
-    }
-
+ 
     // Invoke hook_civicrm_paymentProcessor
     // It needs to invoke this hook after it has done translation,
     // but before it actually starts talking to its proprietary back-end.
@@ -327,39 +318,8 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     if ($this->checkDupe($params['invoiceID'], CRM_Utils_Array::value('contributionID', $params))) {
       throw new PaymentProcessorException(ts('It appears that this transaction is a duplicate.  Have you already submitted the form once?  If so there may have been a connection problem.  Check your email for a receipt.  If you do not receive a receipt within 2 hours you can try your transaction again.  If you continue to have problems please contact the site administrator.'), 9003);
     }
-    /* 
-     // Convert to XML using function below
-     $xml = $this->buildXML($requestFields);
 
-     // Send to the payment processor using cURL
- 
-     $chHost = $host . '?xmldata=' . $xml;
-     $curlParams = [
-       CURLOPT_RETURNTRANSFER => TRUE,
-       CURLOPT_TIMEOUT => 36000,
-       CURLOPT_SSL_VERIFYHOST => Civi::settings()->get('verifySSL') ? 2 : 0,
-       CURLOPT_SSL_VERIFYPEER => Civi::settings()->get('verifySSL'),
-     ];
-     if (ini_get('open_basedir') == '') {
-       $curlParams[CURLOPT_FOLLOWLOCATION] = 1;
-     }
-     $responseData = $this->getGuzzleClient()->post($chHost, [
-       'curl' => $curlParams,
-     ])->getBody();
-     */
-
-    // if (!empty($this->_doDirectPaymentResult)) {
-    //   $result = $this->_doDirectPaymentResult;
-    //   if (empty($result['payment_status_id'])) {
-    //     $result['payment_status_id'] = array_search('Pending', $statuses);
-    //     $result['payment_status'] = 'Pending';
-    //   }
-    //   if ($result['payment_status_id'] === 'failed') {
-    //     throw new PaymentProcessorException($result['message'] ?? 'failed');
-    //   }
-    //   $result['trxn_id'] = array_shift($this->_doDirectPaymentResult['trxn_id']);
-    //   return $result;
-    // }
+    myPushInvoiceToSquare($requestFields);
 
     // $result['trxn_id'] = $this->getTrxnID();
 
