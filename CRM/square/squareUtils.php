@@ -16,6 +16,7 @@ use Square\Exceptions\ApiException;
 #
 function connectToSquare()
 {
+    Civi::log()->debug('squareUtils.php::connectToSquare');
     try {
         $client = SquareClientBuilder::init()
         ->bearerAuthCredentials(
@@ -26,9 +27,10 @@ function connectToSquare()
         ->environment(Environment::SANDBOX)
         ->build();
     } catch (ApiException $e) {
-        echo "ApiException occurred: <b/>";
-        echo $e->getMessage() . "<p/>";
+        civi::log()->debug('squareUtils.php::connectToSquare ApiException occurred: ' . 
+        print_r($e->getMessage(), true));
     }
+    //Civi::log()->debug('squareUtils.php::connectToSquare client ' .  print_r($client, true));
     return $client;
 }
 
@@ -45,50 +47,38 @@ function generateIdempotencyKey()
 #
 function myListLocations($client)
 {
-    print_r('<br/>...<br/>');
-    print_r('List Locations.');
+    Civi::log()->debug('squareUtils.php::myListLocations');
     try {
         $apiResponse = $client->getLocationsApi()->listLocations();
-    
         if ($apiResponse->isSuccess()) {
             $result = $apiResponse->getResult();
-            //print_r('<br/>...<br/>');
-            //print_r('result : ');
-            //print_r($result);
             $locations = array();
             $locations = $result->getLocations();
-            //print_r('<br/>...<br/>');
-            //print_r('locations : ');
-            //print_r($locations);
-            //print_r('<br/>...<br/>');
             foreach ($locations as $var) {
-                print_r('<br/>...<br/>');
-                print_r('location id : ');
-                print_r($var->getId());
-                print_r('<br/>');
-                print_r('name : ');
-                print_r($var->getName());
-                print_r('<br/>');
-                print_r('address : ');
-                print_r($var->getAddress()->getAddressLine1());
-                print_r('<br/>');
-                print_r($var->getAddress()->getLocality());
+                Civi::log()->debug('squareUtils.php::myListLocations location id: ' . print_r($var->getId(),true));
+                Civi::log()->debug('squareUtils.php::myListLocations location name: ' . print_r($var->getName(),true));
+                $address = array();
+                $address = $var->getAddress();
+                Civi::log()->debug('squareUtils.php::myListLocations location address: ' . print_r($address,true));
+                foreach ($address as $var2) {
+                    Civi::log()->debug('squareUtils.php::myListLocations location address line 1: ' . print_r($var2->getAddressLine1(),true));
+                    Civi::log()->debug('squareUtils.php::myListLocations location address line 2: ' . print_r($var2->getAddressLine2(),true));
+                    Civi::log()->debug('squareUtils.php::myListLocations location address locality: ' . print_r($var2->getLocality(),true));
+                }                
             }
     
         } else {
             $errors = $apiResponse->getErrors();
             foreach ($errors as $error) {
-                printf(
-                    "%s<br/> %s<br/> %s<p/>", 
-                    $error->getCategory(),
-                    $error->getCode(),
-                    $error->getDetail()
-                );
+              Civi::log()->debug('squareUtils.php::myListLocations error ' . 
+                print_r($error->getCategory(), true) . ' ' . 
+                print_r($error->getCode(), true) . ' ' .
+                print_r($error->getDetail(), true));
             }
         }
     } catch (ApiException $e) {
-        echo "ApiException occurred: <b/>";
-        echo $e->getMessage() . "<p/>";
+        civi::log()->debug('squareUtils.php::myListLocations ApiException occurred: ' . 
+          print_r($e->getMessage(), true));
     }
     return ($locations);
 }   
@@ -97,16 +87,11 @@ function myListLocations($client)
 #
 function myListLocationsIds($locations)
 {
-    print_r('<br/>...<br/>');
-    print_r('List Locations Ids.');
+    Civi::log()->debug('squareUtils.php::myListLocationsIds');
     $locationsIds = array();
     foreach ($locations as $var) {
-        print_r('<br/>...<br/>');
-        print_r('location id : ');
-        print_r($var->getId());
         $locationsIds[] = $var->getId();
     }
-
     return ($locationsIds);
 }   
 
@@ -230,6 +215,8 @@ function myPrepareOrderBody($requestFields)
     if ($requestFields['line_item_type'] != 'CUSTOM_AMOUNT') {
         $order_line_item->setName($requestFields['line_item_name']);
     }
+    
+    Civi::log()->debug('squareUtils.php::myPrepareOrderBody ' . print_r(strlen($requestFields['line_item_note'])));
     $order_line_item->setNote($requestFields['line_item_note']);
     $order_line_item->setItemType($requestFields['line_item_type']);
     
@@ -277,7 +264,7 @@ function myCreateOrder($body)
         $apiResponse = $client->getOrdersApi()->createOrder($body);
         if ($apiResponse->isSuccess()) {
             $result = $apiResponse->getResult();
-            Civi::log()->debug('squareUtils.php::myCreateOrder result ' . print_r($result,true));
+            //Civi::log()->debug('squareUtils.php::myCreateOrder result ' . print_r($result,true));
             
             $orders = array();
             $orders = $result->getOrder();
@@ -324,7 +311,12 @@ function myCreateOrder($body)
 function myPushInvoiceToSquare($requestFields)
 {
     Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare');
-    myCreateOrder(myPrepareOrderBody($requestFields));
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $requestFields ' . print_r($requestFields, true));
+    $body = myPrepareOrderBody($requestFields);
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $body ' . print_r($body, true));
+    $order = myCreateOrder($body);
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $order ' . print_r($order, true));
+    myCreateInvoice($order);
     return true;
 }
 
@@ -394,12 +386,13 @@ function myListOrders($client)
 
 # Create invoice from Open Order 
 #
-function myCreateInvoice($client)
+function myCreateInvoice($orders)
 {
     Civi::log()->debug('squareUtils.php::myCreateInvoice');
+    Civi::log()->debug('squareUtils.php::myCreateInvoice order date : ' . print_r(date('Y-m-d'), true));
     $invoice_payment_request = new \Square\Models\InvoicePaymentRequest();
     $invoice_payment_request->setRequestType('BALANCE');
-    $invoice_payment_request->setDueDate('2024-08-01');
+    $invoice_payment_request->setDueDate(date('Y-m-d'));
     $invoice_payment_request->setAutomaticPaymentSource('NONE');
     
     $payment_requests = [$invoice_payment_request];
@@ -409,24 +402,25 @@ function myCreateInvoice($client)
     $accepted_payment_methods->setCashAppPay(false);
     
     $invoice = new \Square\Models\Invoice();
-    $invoice->setLocationId('L5PCE8REVXZN6');
-    $invoice->setOrderId('S8iXuyO3qzLo7Z1CVz7KPGJWkVQZY');
+    $invoice->setLocationId($orders->getLocationId());
+    $invoice->setOrderId($orders->getId());
     $invoice->setPaymentRequests($payment_requests);
     $invoice->setDeliveryMethod('SHARE_MANUALLY');
-    $invoice->setScheduledAt('2024-08-01T13:45:31.700Z');
+    $invoice->setScheduledAt($orders->getCreatedAt());
     $invoice->setAcceptedPaymentMethods($accepted_payment_methods);
     
     $body = new \Square\Models\CreateInvoiceRequest($invoice);
-    $body->setIdempotencyKey('e410d51d-3900-4c52-8b25-af353cd02ba7');
+    $body->setIdempotencyKey(generateIdempotencyKey());
+
+    $client = connectToSquare(); 
     
     try {
         $apiResponse = $client->getInvoicesApi()->createInvoice($body);
     
         if ($apiResponse->isSuccess()) {
             $result = $apiResponse->getResult();
-            print_r('result : ');
-            print_r($result);
-            print_r('<br/>...<br/>');
+            Civi::log()->debug('squareUtils.php::myCreateInvoice $result : ' . print_r($result, true));
+        
         } else {
             $errors = $apiResponse->getErrors();
             foreach ($errors as $error) {

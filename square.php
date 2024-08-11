@@ -23,7 +23,7 @@ function square_civicrm_config(&$config): void {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_install
  */
 function square_civicrm_install(): void {
-  Civi::log()->debug('square.php::civicrm_install hook' . '  ');
+  Civi::log()->debug('square.php::civicrm_install hook');
   _square_civix_civicrm_install();
 }
 
@@ -37,24 +37,6 @@ function square_civicrm_enable(): void {
   _square_civix_civicrm_enable();
 }
 
-/**
- * Implements hook_civicrm_check().
- * 
- * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_check
- */
-function square_civicrm_check(&$messages) {
-  Civi::log()->debug('square.php::civicrm_check hook messages' . '  ' . print_r($messages,true));
-  
-  if (false) {
-    $messages[] = new CRM_Utils_Check_Message(
-      'iats_soap',
-      ts('The SOAP extension for PHP %1 is not installed on this server, but is required for this extension.', array(1 => phpversion())),
-      ts('iATS Payments Installation'),
-      \Psr\Log\LogLevel::CRITICAL,
-      'fa-flag'
-    );
-  }
-}
 
 /**
  * Implements hook_civicrm_managed().
@@ -62,6 +44,7 @@ function square_civicrm_check(&$messages) {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_managed
  */
 function square_civicrm_managed(&$entities): void {
+  Civi::log()->debug('square.php::civicrm_managed hook');
   foreach ($entities as $entity) {
     if($entity["module"] == 'me.sxs.square') {
       Civi::log()->debug('square.php::civicrm_managed entity' . '  ' . print_r($entity, true));
@@ -83,7 +66,7 @@ function square_civicrm_postinstall(): void {
     
   // Check if a financial account "Square Account" exist.
   // If not, create it.
-  $financial_accounts = \Civi\Api4\FinancialAccount::save(TRUE)
+  $financial_accounts = \Civi\Api4\FinancialAccount::save(FALSE)
     ->addRecord([
       'name' => 'Square Account',
       'contact_id' => 1,
