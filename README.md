@@ -11,11 +11,11 @@ Before installation, you need to configure your SQUARE_ACCESS_TOKEN as an enviro
 Under, ngix, this is done in /etc/nginx/fastcgi.config.
 
 Upon installation, the extension check for the following CiviCRM entities
- a) Financial account named Square Account, and create it when not found
- b) Payment instrument named Square terminal, and create it when not found
- c) Payment processor type named Square terminal, and create it when not found
- d) Does not create the payment gateway per see, must be done manually
- e) A webhook from Square to the CiviCRM listener endpoint, and create it when not found
+ - a) Financial account named Square Account, and create it when not found
+ - b) Payment instrument named Square terminal, and create it when not found
+ - c) Payment processor type named Square terminal, and create it when not found
+ - d) Does not create the payment gateway per see, must be done manually
+ - e) A webhook from Square to the CiviCRM listener endpoint, and create it when not found
 
 When used to process a payment, the extension hide form part to collect credit card information.
 Print instruction to proceed to square terminal.
@@ -96,4 +96,7 @@ Start play with this and give me feedback on most needed improvment.
 
 ## Known Issues
 
-(* FIXME *)
+- Completed to order to invoice conversion process
+- Need to fix return code in case of error
+- Need list of completed task in case of error
+- Keep trace of idem potency key for retry in case of error
