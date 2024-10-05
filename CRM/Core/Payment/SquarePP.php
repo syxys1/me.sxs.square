@@ -319,7 +319,7 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
       throw new PaymentProcessorException(ts('It appears that this transaction is a duplicate.  Have you already submitted the form once?  If so there may have been a connection problem.  Check your email for a receipt.  If you do not receive a receipt within 2 hours you can try your transaction again.  If you continue to have problems please contact the site administrator.'), 9003);
     }
 
-    myPushInvoiceToSquare($requestFields);
+    CRM_Square_Utils::myPushInvoiceToSquare($this->_paymentProcessor, $requestFields);
 
     // $result['trxn_id'] = $this->getTrxnID();
 

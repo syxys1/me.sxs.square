@@ -39,56 +39,29 @@ Any help is welcome.  Use at your own risk.
 
 Upon second installation, the extension check for following CiviCRM entities
 
-
 The extension is licensed under [AGPL-3.0](LICENSE.txt).
 
 ## Requirements
 
-* PHP v7.4+      to be confirmed (currentl work on 8.2)
-* CiviCRM (7.X)  to be confirmed (curently work on 7.5.0) 
-* WP 
+* PHP v8.0+
+* CiviCRM 5.75 or later
 
+## Installation
 
-## Manual Installation
-
-This is the only supported installation method for know.
 Download the `.zip` file and expand it in wp-content/uploads/civicrm/ext.
 You need composer to install the Square SDK and use it. (to be confirmed)
 
+See the section below for more information on how to create a Square Account Token.
 
-## Installation (Web UI)
+## Square Account Setup
 
-Learn more about installing CiviCRM extensions in the [CiviCRM Sysadmin Guide](https://docs.civicrm.org/sysadmin/en/latest/customize/extensions/).
+https://developer.squareup.com/console/
 
-## Installation (CLI, Zip)
+- Register a new application (type "Accept Payments")
+- Audience: you can skip
+- The Access Token will then be displayed
 
-Sysadmins and developers may download the `.zip` file for this extension and
-install it with the command-line tool [cv](https://github.com/civicrm/cv).
-
-```bash
-cd <extension-dir>
-cv dl me.sxs.square@https://github.com/FIXME/me.sxs.square/archive/master.zip
-```
-or
-```bash
-cd <extension-dir>
-cv dl me.sxs.square@https://lab.civicrm.org/extensions/me.sxs.square/-/archive/main/me.sxs.square-main.zip
-```
-
-## Installation (CLI, Git)
-
-Sysadmins and developers may clone the [Git](https://en.wikipedia.org/wiki/Git) repo for this extension and
-install it with the command-line tool [cv](https://github.com/civicrm/cv).
-
-```bash
-git clone https://github.com/FIXME/me.sxs.square.git
-cv en square
-```
-or
-```bash
-git clone https://lab.civicrm.org/extensions/me.sxs.square.git
-cv en square
-```
+Square does not let you delete applications, but you can rename them.
 
 ## Getting Started
 
