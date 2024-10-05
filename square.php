@@ -1,7 +1,11 @@
 <?php
 
 require_once 'square.civix.php';
-require_once 'CRM/square/squareUtils.php';
+
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (file_exists($autoload)) {
+  require_once $autoload;
+}
 
 // phpcs:disable
 use CRM_Square_ExtensionUtil as E;
@@ -13,7 +17,6 @@ use CRM_Square_ExtensionUtil as E;
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_config/
  */
 function square_civicrm_config(&$config): void {
-  
   _square_civix_civicrm_config($config);
 }
 
@@ -23,7 +26,6 @@ function square_civicrm_config(&$config): void {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_install
  */
 function square_civicrm_install(): void {
-  Civi::log()->debug('square.php::civicrm_install hook');
   _square_civix_civicrm_install();
 }
 
@@ -33,10 +35,8 @@ function square_civicrm_install(): void {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_enable
  */
 function square_civicrm_enable(): void {
-  Civi::log()->debug('square.php::civicrm_enable hook');
   _square_civix_civicrm_enable();
 }
-
 
 /**
  * Implements hook_civicrm_managed().
@@ -60,10 +60,6 @@ function square_civicrm_managed(&$entities): void {
 function square_civicrm_postinstall(): void {
   Civi::log()->debug('square.php::civicrm_postinstall hook');
   
-  // Check if a webhook exist in Square and compare it to CiviCRM endpoint URL.
-  // If not present, create it.
-  myUpdateWebhookSubscription(generateWebhookUrl());
-    
   // Check if a financial account "Square Account" exist.
   // If not, create it.
   $financial_accounts = \Civi\Api4\FinancialAccount::save(FALSE)
@@ -150,7 +146,7 @@ function square_civicrm_postIPNProcess(&$IPNData) {
     $customParams = json_decode($IPNData['custom'], TRUE);
     if (!empty($customParams['gaid'])) {
       Civi::log()->debug('square.php::postIPNProcess hook json decode' . '  ' . print_r($customParams["gaid"], true));
-  // trigger GA event id for e-commerce tracking.
+      // trigger GA event id for e-commerce tracking.
     }
   }
 }
@@ -164,9 +160,8 @@ function square_civicrm_postIPNProcess(&$IPNData) {
  * @param CRM_Core_Form $form
  */
 function square_civicrm_postProcess($formName, $form) {
-  Civi::log()->debug('square.php::postProcess hook formName' . '  ' . print_r($formName, true));
-  //Civi::log()->debug('square.php::postProcess hook form' . '  ' . print_r($form, true));  
-
+  // Civi::log()->debug('square.php::postProcess hook formName' . '  ' . print_r($formName, true));
+  // Civi::log()->debug('square.php::postProcess hook form' . '  ' . print_r($form, true));  
 }
 
 /**
@@ -175,11 +170,11 @@ function square_civicrm_postProcess($formName, $form) {
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_alterContent
  */
 function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
-  Civi::log()->debug('square.php::civicrm_alterContent Hook templateName' . '  ' . print_r($tplName, true));
-  Civi::log()->debug('squere.php::civicrm_alterContent Hook context' . '  ' . print_r($context, true));
+  // Civi::log()->debug('square.php::civicrm_alterContent Hook templateName' . '  ' . print_r($tplName, true));
+  // Civi::log()->debug('squere.php::civicrm_alterContent Hook context' . '  ' . print_r($context, true));
   
-  if($context == "form") {
-    if($tplName == "CRM/Event/Form/Registration/Confirm.tpl") {
+  if ($context == "form") {
+    if ($tplName == "CRM/Event/Form/Registration/Confirm.tpl") {
       $closuremethod = Closure::bind(function($object) {
         return $object->_params;
       }, null, get_class($object));
@@ -219,19 +214,10 @@ function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
     return $value;
   };
 }
+
 /**
- * Utility function to get domain info and genrate 
- * a Webhook URL for this payment processor.
- *
+ * Implements hook_civicrm_check().
  */
-function generateWebhookUrl()
-{
-  # The URL that this server is listening on (e.g., 'http://example.com/events')
-  # Note that to receive notifications from Square, this cannot be a localhost URL
-  # TODO MUST change to get Payment Processor ID from code
-  $webhookUrlLocal = 'civicrm/payment/ipn/32/';
-  $domain = CRM_Utils_System::baseURL();
-  $webhookUrl = $domain . $webhookUrlLocal;
-  Civi::log()->debug('square.php::generateWebhookUrl webhookUrl ' . print_r($webhookUrl,true));
-  return $webhookUrl;
+function square_civicrm_check(&$messages) {
+  CRM_Square_Webhook::check($messages);
 }
