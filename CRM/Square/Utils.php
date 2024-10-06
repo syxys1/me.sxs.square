@@ -17,14 +17,14 @@ class CRM_Square_Utils {
   /**
    * Connect to Square account
    */
-  public static function connectToSquare(string $token)
+  public static function connectToSquare(array $paymentProcessor)
   {
     Civi::log()->debug('CRM_Square_Utils::connectToSquare');
+    $env = $paymentProcessor['is_test'] ? Environment::SANDBOX : Environment::PRODUCTION;
     $client = SquareClientBuilder::init()
-      ->bearerAuthCredentials(BearerAuthCredentialsBuilder::init($token))
-      ->environment(Environment::SANDBOX)
+      ->bearerAuthCredentials(BearerAuthCredentialsBuilder::init($paymentProcessor['user_name']))
+      ->environment($env)
       ->build();
-    //Civi::log()->debug('squareUtils.php::connectToSquare client ' .  print_r($client, true));
     return $client;
   }
 
@@ -43,42 +43,32 @@ class CRM_Square_Utils {
    */
   public static function myListLocations($client)
   {
-    Civi::log()->debug('squareUtils.php::myListLocations');
-    try {
-      $apiResponse = $client->getLocationsApi()->listLocations();
-      if ($apiResponse->isSuccess()) {
-        $result = $apiResponse->getResult();
-        $locations = [];
-        $locations = $result->getLocations();
-        foreach ($locations as $var) {
-          Civi::log()->debug('squareUtils.php::myListLocations location id: ' . print_r($var->getId(),true));
-          Civi::log()->debug('squareUtils.php::myListLocations location name: ' . print_r($var->getName(),true));
-          $address = [];
-          $address = $var->getAddress();
-          Civi::log()->debug('squareUtils.php::myListLocations location address: ' . print_r($address,true));
-          foreach ($address as $var2) {
-            Civi::log()->debug('squareUtils.php::myListLocations location address line 1: ' . print_r($var2->getAddressLine1(),true));
-            Civi::log()->debug('squareUtils.php::myListLocations location address line 2: ' . print_r($var2->getAddressLine2(),true));
-            Civi::log()->debug('squareUtils.php::myListLocations location address locality: ' . print_r($var2->getLocality(),true));
-          }
-        }
-      }
-      else {
-        $errors = $apiResponse->getErrors();
-        foreach ($errors as $error) {
-          Civi::log()->debug('squareUtils.php::myListLocations error '
-            . print_r($error->getCategory(), true) . ' '
-            . print_r($error->getCode(), true) . ' '
-            . print_r($error->getDetail(), true));
+    Civi::log()->debug('CRM_Square_Utils::myListLocations');
+    $location = [];
+    $apiResponse = $client->getLocationsApi()->listLocations();
+    if ($apiResponse->isSuccess()) {
+      $result = $apiResponse->getResult();
+      $locations = [];
+      $locations = $result->getLocations();
+      foreach ($locations as $var) {
+        Civi::log()->debug('squareUtils.php::myListLocations location id: ' . print_r($var->getId(),true));
+        Civi::log()->debug('squareUtils.php::myListLocations location name: ' . print_r($var->getName(),true));
+        $address = [];
+        $address = $var->getAddress();
+        Civi::log()->debug('squareUtils.php::myListLocations location address: ' . print_r($address,true));
+        foreach ($address as $var2) {
+          Civi::log()->debug('squareUtils.php::myListLocations location address line 1: ' . print_r($var2->getAddressLine1(),true));
+          Civi::log()->debug('squareUtils.php::myListLocations location address line 2: ' . print_r($var2->getAddressLine2(),true));
+          Civi::log()->debug('squareUtils.php::myListLocations location address locality: ' . print_r($var2->getLocality(),true));
         }
       }
     }
-    catch (ApiException $e) {
-      Civi::log()->debug('squareUtils.php::myListLocations ApiException occurred: '
-        . print_r($e->getMessage(), true));
+    else {
+      $errors = $apiResponse->getErrors();
+      throw new Exception('Square getLocationsApi failed: category=' . print_r($errors, 1));
     }
-    return ($locations);
-  } 
+    return $locations;
+  }
 
   /**
    * List Square Location id
@@ -90,7 +80,7 @@ class CRM_Square_Utils {
     foreach ($locations as $var) {
       $locationsIds[] = $var->getId();
     }
-    return ($locationsIds);
+    return $locationsIds;
   } 
 
   /**
@@ -99,7 +89,7 @@ class CRM_Square_Utils {
   public static function myPrepareOrderBody($paymentProcessor, $requestFields)
   {
     Civi::log()->debug('squareUtils.php::myPrepareOrderBody');
-    $client = self::connectToSquare($paymentProcessor['user_name']);
+    $client = self::connectToSquare($paymentProcessor);
 
     $order_line_item_applied_tax = new \Square\Models\OrderLineItemAppliedTax($requestFields['line_item_tax']);
     $order_line_item_applied_tax1 = new \Square\Models\OrderLineItemAppliedTax($requestFields['line_item_tax1']);
@@ -121,8 +111,9 @@ class CRM_Square_Utils {
     $order_line_item->setNote($requestFields['line_item_note']);
     $order_line_item->setItemType($requestFields['line_item_type']);
 
-    //$locationId = self::myListLocations($client)->getId();
-    $order = new \Square\Models\Order(self::myListLocationsIds(self::myListLocations($client))[0]);
+    // Associated the order with the default location
+    $locations = self::myListLocations($client);
+    $order = new \Square\Models\Order($locations[0]->getId());
 
     if ($requestFields['applied_tax_amount'] > 0) {
       $order_line_item->setAppliedTaxes($applied_taxes);
@@ -161,7 +152,7 @@ class CRM_Square_Utils {
   public static function myCreateOrder($paymentProcessor, $body)
   {
       Civi::log()->debug('squareUtils.php::myCreateOrder');
-      $client = self::connectToSquare($paymentProcessor['user_name']);
+      $client = self::connectToSquare($paymentProcessor);
       try {
           $apiResponse = $client->getOrdersApi()->createOrder($body);
           if ($apiResponse->isSuccess()) {
@@ -317,7 +308,7 @@ class CRM_Square_Utils {
       $body = new \Square\Models\CreateInvoiceRequest($invoice);
       $body->setIdempotencyKey(self::generateIdempotencyKey());
 
-      $client = self::connectToSquare($paymentProcessor['user_name']);
+      $client = self::connectToSquare($paymentProcessor);
 
       try {
           $apiResponse = $client->getInvoicesApi()->createInvoice($body);
