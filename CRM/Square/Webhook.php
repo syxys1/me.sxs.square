@@ -104,9 +104,10 @@ class CRM_Square_Webhook {
    * Update Square Webhook Subscription 
    * @todo Not currently used
    */
-  function myUpdateWebhookSubscription($paymentProcessor): void {
+  public static function myUpdateWebhookSubscription($paymentProcessor): void {
     Civi::log()->debug('squareUtils.php::myUpdateWebhookSubscription');
-    $client = CRM_Square_Utils::connectToSquare($paymentProcessor['user_name']);
+    $webhookUrl = self::getWebhookPath($paymentProcessor['id']);
+    $client = CRM_Square_Utils::connectToSquare($paymentProcessor);
     $subscriptions = [];
     $subscriptions = self::myListWebhookSubscriptions($client);
     $found = 0;
@@ -117,6 +118,7 @@ class CRM_Square_Webhook {
       $found += $var->getNotificationUrl() == $webhookUrl ? 1 : 0;
     }
     if (!$found) {
+      // todo check subscription count : must be lower that 3 to be able tp add another one
       self::createWebhookSubscription($client, $webhookUrl);
       Civi::log()->debug('squareUtils.php::myUpdateWebhookSubscription create new webhook');
     }
@@ -171,12 +173,12 @@ class CRM_Square_Webhook {
     $subscription = new \Square\Models\WebhookSubscription();
     # define webhook name
     # TODO Function to generate the webhook name
-    $subscription->setName('CiviCRM_Webhook');
+    $subscription->setName('CiviCRM_Webhook_devTestWp');
     $subscription->setEventTypes($event_types);
     $subscription->setNotificationUrl($webhookUrl);
 
     $body = new \Square\Models\CreateWebhookSubscriptionRequest($subscription);
-    $body->setIdempotencyKey(generateIdempotencyKey());
+    $body->setIdempotencyKey(CRM_Square_Utils::generateIdempotencyKey());
     print_r('<br/>...<br/>');
     print_r('Create Webhook Subscription.');
     try {

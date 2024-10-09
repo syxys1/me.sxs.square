@@ -7,11 +7,6 @@ use Square\Authentication\BearerAuthCredentialsBuilder;
 use Square\Environment;
 use Square\Exceptions\ApiException;
 
-# set SQUARE_ACCESS_TOKEN in /etc/nginx/fastcgi.config
-# Currently, the SQUARE_ACCESS_ TOKEN is set 
-# in /etc/nginx/fastcgi.config
-# TODO MUST change to get it from Payment Processor config from code
-
 class CRM_Square_Utils {
 
   /**
@@ -20,6 +15,8 @@ class CRM_Square_Utils {
   public static function connectToSquare(array $paymentProcessor)
   {
     Civi::log()->debug('CRM_Square_Utils::connectToSquare');
+    Civi::log()->debug('CRM_Square_Utils::connectToSquare paymentProcessor ' . print_r($paymentProcessor, true));
+    
     $env = $paymentProcessor['is_test'] ? Environment::SANDBOX : Environment::PRODUCTION;
     $client = SquareClientBuilder::init()
       ->bearerAuthCredentials(BearerAuthCredentialsBuilder::init($paymentProcessor['user_name']))
@@ -84,9 +81,61 @@ class CRM_Square_Utils {
   } 
 
   /**
+   * Update Square Customer
+   */
+  public static function myUpdateCustomer($paymentProcessor, $requestFields)
+  {
+    Civi::log()->debug('CRM_Square_Utils::myUpdateCustomer');
+    civi::log()->debug('CRM_Square_Utils::myUpdateCustomer requestFields' . print_r($requestFields, true));
+    $customer = self::myCreateCustomer($paymentProcessor, $requestFields);
+    return $customer;
+  }
+
+  /**
+   * Create Square Customer
+   */
+  public static function myCreateCustomer($paymentProcessor, $requestFields)
+  {
+    Civi::log()->debug('CRM_Square_Utils::myCreateCustomer');
+    $client = self::connectToSquare($paymentProcessor);
+
+    $customerRequest = new \Square\Models\CreateCustomerRequest();
+    $customerRequest->setIdempotencyKey(self::generateIdempotencyKey());
+    $customerRequest->setGivenName($requestFields['first_name']);
+    $customerRequest->setFamilyName($requestFields['last_name']);
+    $customerRequest->setEmailAddress($requestFields['email']);
+    $customerRequest->setPhoneNumber($requestFields['phone']);
+    try {
+      $apiResponse = $client->getCustomersApi()->createCustomer($customerRequest);
+
+      if ($apiResponse->isSuccess()) {
+        $customer = $apiResponse->getResult();
+        Civi::log()->debug('CRM_Square_Utils::myCreateCustomer result ' . print_r($customer, true));
+        Civi::log()->debug('CRM_Square_Utils::myCreateCustomer customer id ' . print_r($customer->getCustomer()->getId(), true));
+      } else {
+        $errors = $apiResponse->getErrors();
+        foreach ($errors as $error) {
+            Civi::log()->debug('CRM_Square_Utils::myCreateCustomer errors ' . 
+                print_r($error->getCategory(), true) . ' ' . 
+                print_r($error->getCode(), true) . ' ' .
+                print_r($error->getDetail(), true));
+        }
+        throw new Exception('CRM_Square_Utils::myCreateCustomer: ' . print_r($errors, true));
+      }
+
+    } catch (ApiException $e) {
+          Civi::log()->debug('CRM_Square_Utils::myCreateCustomer ApiException occurred: ' . 
+              print_r($e->getMessage(), true));
+    }
+    return $customer;
+}
+
+
+
+  /**
    * Create new Square order 
    */
-  public static function myPrepareOrderBody($paymentProcessor, $requestFields)
+  public static function myPrepareOrderBody($paymentProcessor, $requestFields, $customer)
   {
     Civi::log()->debug('squareUtils.php::myPrepareOrderBody');
     $client = self::connectToSquare($paymentProcessor);
@@ -133,11 +182,11 @@ class CRM_Square_Utils {
     $line_items = [$order_line_item];
 
     $order->setReferenceId($requestFields['reference_id']);
-    $order->setCustomerId($requestFields['customer_id']);
+    $order->setCustomerId($customer->getCustomer()->getId());
     $order->setLineItems($line_items);
 
     $order->setState('OPEN');
-    $order->setTicketName($requestFields['ticket_name']);
+    //$order->setTicketName($requestFields['ticket_name']);
 
     $body = new \Square\Models\CreateOrderRequest();
     $body->setOrder($order);
@@ -152,6 +201,8 @@ class CRM_Square_Utils {
   public static function myCreateOrder($paymentProcessor, $body)
   {
       Civi::log()->debug('squareUtils.php::myCreateOrder');
+      Civi::log()->debug('squareUtils.php::myCreateOrder body ' . print_r($body, true));
+      
       $client = self::connectToSquare($paymentProcessor);
       try {
           $apiResponse = $client->getOrdersApi()->createOrder($body);
@@ -198,22 +249,7 @@ class CRM_Square_Utils {
       return ($orders);
   }
 
-  /**
-   * Create a new Square order 
-   * Convert it to invoice
-   */
-  public static function myPushInvoiceToSquare($paymentProcessor, $requestFields)
-  {
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare');
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $requestFields ' . print_r($requestFields, true));
-    $body = self::myPrepareOrderBody($paymentProcessor, $requestFields);
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $body ' . print_r($body, true));
-    $order = self::myCreateOrder($paymentProcessor, $body);
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $order ' . print_r($order, true));
-    self::myCreateInvoice($paymentProcessor, $order);
-    return true;
-  }
-
+  
   /**
    * List Square Orders 
    */
@@ -286,25 +322,29 @@ class CRM_Square_Utils {
   {
       Civi::log()->debug('squareUtils.php::myCreateInvoice');
       Civi::log()->debug('squareUtils.php::myCreateInvoice order date : ' . print_r(date('Y-m-d'), true));
+
+      $primary_recipient = new \Square\Models\InvoiceRecipient();
+      $primary_recipient->setCustomerId($orders->getCustomerId());
+      
       $invoice_payment_request = new \Square\Models\InvoicePaymentRequest();
       $invoice_payment_request->setRequestType('BALANCE');
       $invoice_payment_request->setDueDate(date('Y-m-d'));
       $invoice_payment_request->setAutomaticPaymentSource('NONE');
-
       $payment_requests = [$invoice_payment_request];
+
       $accepted_payment_methods = new \Square\Models\InvoiceAcceptedPaymentMethods();
       $accepted_payment_methods->setCard(true);
-      $accepted_payment_methods->setBuyNowPayLater(false);
-      $accepted_payment_methods->setCashAppPay(false);
-
+      
       $invoice = new \Square\Models\Invoice();
       $invoice->setLocationId($orders->getLocationId());
       $invoice->setOrderId($orders->getId());
+      $invoice->setPrimaryRecipient($primary_recipient);
       $invoice->setPaymentRequests($payment_requests);
       $invoice->setDeliveryMethod('SHARE_MANUALLY');
-      $invoice->setScheduledAt($orders->getCreatedAt());
+      //$invoice->setScheduledAt($orders->getCreatedAt());
       $invoice->setAcceptedPaymentMethods($accepted_payment_methods);
-
+      $invoice->setStorePaymentMethodEnabled(true);
+      
       $body = new \Square\Models\CreateInvoiceRequest($invoice);
       $body->setIdempotencyKey(self::generateIdempotencyKey());
 
@@ -314,10 +354,11 @@ class CRM_Square_Utils {
           $apiResponse = $client->getInvoicesApi()->createInvoice($body);
 
           if ($apiResponse->isSuccess()) {
-              $result = $apiResponse->getResult();
-              Civi::log()->debug('squareUtils.php::myCreateInvoice $result : ' . print_r($result, true));
+              $invoice = $apiResponse->getResult();
+              Civi::log()->debug('squareUtils.php::myCreateInvoice $invoice : ' . print_r($invoice, true));
 
           } else {
+              $invoice = null;
               $errors = $apiResponse->getErrors();
               foreach ($errors as $error) {
                   Civi::log()->debug('squareUtils.php::myCreateInvoice errors ' . 
@@ -330,6 +371,40 @@ class CRM_Square_Utils {
           Civi::log()->debug('squareUtils.php::myCreateInvoice errors ApiException occurred: ' . 
               print_r($e->getMessage(), true));
       }
+      return $invoice;
+  }
+
+  /**
+   * Publish invoice to be visible at terminal 
+   */
+  public static function myPublishInvoice($paymentProcessor, $invoice)
+  {
+    Civi::log()->debug('squareUtils.php::myPublishInvoice');
+    $client = self::connectToSquare($paymentProcessor);
+
+    $publishRequest = new \Square\Models\PublishInvoiceRequest($invoice->getInvoice()->getVersion());
+    try {
+      $apiResponse = $client->getInvoicesApi()->publishInvoice($invoice->getInvoice()->getId(), $publishRequest);
+
+      if ($apiResponse->isSuccess()) {
+        $result = $apiResponse->getResult();
+        Civi::log()->debug('CRM_Square_Utils::myPublishInvoice result ' . print_r($result, true));
+
+      } else {
+        $errors = $apiResponse->getErrors();
+        foreach ($errors as $error) {
+            Civi::log()->debug('CRM_Square_Utils::myPublishInvoice errors ' . 
+                print_r($error->getCategory(), true) . ' ' . 
+                print_r($error->getCode(), true) . ' ' .
+                print_r($error->getDetail(), true));
+        }
+        throw new Exception('CRM_Square_Utils::myPublishInvoice: ' . print_r($errors, true));
+      }
+
+    } catch (ApiException $e) {
+          Civi::log()->debug('CRM_Square_Utils::myPublishInvoice ApiException occurred: ' . 
+              print_r($e->getMessage(), true));
+    }
   }
 
   /**
@@ -430,6 +505,27 @@ class CRM_Square_Utils {
           Civi::log()->debug('squareUtils.php::myListInvoice errors ApiException occurred: ' . 
               print_r($e->getMessage(), true));
       }
+  }
+
+/**
+   * Create a new Square order 
+   * Convert it to invoice
+   * Check for customer presence, if absent create it
+   * Publish invoice
+   */
+  public static function myPushInvoiceToSquare($paymentProcessor, $requestFields)
+  {
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare');
+    $customer = self::myUpdateCustomer($paymentProcessor, $requestFields);
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $requestFields ' . print_r($requestFields, true));
+    $body = self::myPrepareOrderBody($paymentProcessor, $requestFields, $customer);
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $body ' . print_r($body, true));
+    $order = self::myCreateOrder($paymentProcessor, $body);
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $order ' . print_r($order, true));
+    $invoice = self::myCreateInvoice($paymentProcessor, $order);
+    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $invoice ' . print_r($invoice, true));
+    self::myPublishInvoice($paymentProcessor, $invoice);
+    return true;
   }
 
 }

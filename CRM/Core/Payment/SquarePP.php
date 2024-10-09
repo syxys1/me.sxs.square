@@ -223,11 +223,22 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
    */
   public function mapProcessorFieldstoParams($params) {
 
+    // 32 characters string max
     //$requestFields['a'] = $params['billing_first_name'];
     //$requestFields['b'] = $params['billing_last_name'];
-    $requestFields['c'] = $params['first_name'];
-    $requestFields['d'] = $params['last_name'];
-    // 32 character string
+    $requestFields['first_name'] = $params['first_name'];
+    $requestFields['last_name'] = $params['last_name'];
+    
+    //$requestFields['e'] = $params['street_address'];
+    //$requestFields['f'] = $params['city'];
+    //$requestFields['g'] = $params['state_province'];
+    //$requestFields['h'] = $params['postal_code'];
+    //$requestFields['i'] = $params['country'];
+    $requestFields['email'] = $params['email-Primary'];
+    
+    $requestFields['phone'] = null;
+    //$requestFields['phone'] = $params['phone-Primary'];
+    
     $requestFields['base_price_amount'] = (int)trim($params['amount']) * 100;
     $requestFields['base_price_currency'] = $params['currencyID'];
     $requestFields['applied_tax_amount'] = (int)trim($params['tax_amount']) * 100;
@@ -241,13 +252,6 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     
     $requestFields['reference_id'] = $params['contributionID'];
     $requestFields['customer_id'] = $params['contact_id'];
-    $requestFields['ticket_name'] = $params['email-Primary'];
-    
-    //$requestFields['e'] = $params['street_address'];
-    //$requestFields['f'] = $params['city'];
-    //$requestFields['g'] = $params['state_province'];
-    //$requestFields['h'] = $params['postal_code'];
-    //$requestFields['i'] = $params['country'];
     
     return $requestFields;
   }
@@ -259,7 +263,7 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
    *  Result to be returned from test.
    */
   public function setDoDirectPaymentResult($doDirectPaymentResult) {
-    Civi::log()->debug('SuarePP.php::setDoDirectPaymentResult' . '  ' . $doDirectPaymentResult);
+    Civi::log()->debug('SuarePP.php::setDoDirectPaymentResult ' . $doDirectPaymentResult);
     $this->_doDirectPaymentResult = $doDirectPaymentResult;
     if (empty($this->_doDirectPaymentResult['trxn_id'])) {
       $this->_doDirectPaymentResult['trxn_id'] = [];
@@ -268,7 +272,6 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
       $this->_doDirectPaymentResult['trxn_id'] = (array) $doDirectPaymentResult['trxn_id'];
     }
   }
-
 
   /**
    * 
@@ -284,8 +287,8 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
   public function doPayment(&$params, $component = 'contribute') {
-    Civi::log()->debug('squarePP.php::doPayment component' . '  ' . print_r($component, true));
-    Civi::log()->debug('squarePP.php::doPayment params' . '  ' . print_r($params, true));
+    Civi::log()->debug('squarePP.php::doPayment component ' . print_r($component, true));
+    Civi::log()->debug('squarePP.php::doPayment params ' . print_r($params, true));
     
     $propertyBag = \Civi\Payment\PropertyBag::cast($params);
     $this->_component = $component;
@@ -532,7 +535,27 @@ class CRM_Core_Payment_SquarePP extends CRM_Core_Payment {
     }
     return NULL;
   }
-  
 
+  /**
+   * This public function checks to see if we have the right processor config values set.
+   *
+   * NOTE: Called by Events and Contribute to check config params are set prior to trying
+   *  register any credit card details
+   *
+   * @return string|null
+   *   $errorMsg if any errors found - null if OK
+   *
+   */
+  public static function checkConfig2(&$messages): void {
+
+    if (empty($this->_paymentProcessor['user_name'])) {
+      $messages[] = ' ' . ts('ssl_merchant_id is not set for this payment processor');
+    }
+
+    if (empty($this->_paymentProcessor['url_site'])) {
+      $messages[] = ' ' . ts('URL is not set for this payment processor');
+    }
+
+  }
 
 }

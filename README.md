@@ -7,20 +7,25 @@ This CiviCRM extension add a new payment processor gateway.
 
 Flowchart (alpha version)
 
-Before installation, you need to configure your SQUARE_ACCESS_TOKEN as an environment variable.
-Under, ngix, this is done in /etc/nginx/fastcgi.config.
+~~Before installation, you need to configure your SQUARE_ACCESS_TOKEN as an environment variable.~~
+~~Under, ngix, this is done in /etc/nginx/fastcgi.config.~~
 
 Upon installation, the extension check for the following CiviCRM entities
  - a) Financial account named Square Account, and create it when not found
  - b) Payment instrument named Square terminal, and create it when not found
  - c) Payment processor type named Square terminal, and create it when not found
  - d) Does not create the payment gateway per see, must be done manually
- - e) A webhook from Square to the CiviCRM listener endpoint, and create it when not found
+~~ - e) A webhook from Square to the CiviCRM listener endpoint, and create it when not found~~
 
-When used to process a payment, the extension hide form part to collect credit card information.
-Print instruction to proceed to square terminal.
-The extension create an OPEN order in Square terminal to the first current location (need to addressed).
-Then convert this Square order into an invoice in order to be paid for.
+Payment Gateway need to be setup manually.  Extension will check for the presence of required values.
+
+When used to process a payment, the extension 
+- Check for a webhook from Square to the CiviCRM listener endpoint, and create it when not found
+- Hide the form part that collect credit card information.
+- Print instruction to proceed to square terminal.
+- Create an OPEN order in Square terminal to the first current location (need to addressed).
+- Convert this Square order into an invoice in order to be paid for.
+- Publish the invoice in order to be seen at the terminal
 
 CiviCRM wait for the webhook message that confirm the invoice have been paid for.
 Still some work to be done here to change status from pending to completed.
@@ -37,7 +42,7 @@ code testing.
 
 Any help is welcome.  Use at your own risk.
 
-Upon second installation, the extension check for following CiviCRM entities
+
 
 The extension is licensed under [AGPL-3.0](LICENSE.txt).
 
@@ -57,6 +62,7 @@ See the section below for more information on how to create a Square Account Tok
 
 https://developer.squareup.com/console/
 
+- You need your Square account credentials, or to create an account if you don't have one.
 - Register a new application (type "Accept Payments")
 - Audience: you can skip
 - The Access Token will then be displayed

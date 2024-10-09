@@ -39,6 +39,16 @@ function square_civicrm_enable(): void {
 }
 
 /**
+ * Implements hook_civicrm_check().
+ * 
+ * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_check
+ */
+function square_civicrm_check(&$messages) {
+  CRM_Core_Payment_SquarePP::checkConfig2($messages);
+  //CRM_Square_Webhook::check($messages);
+}
+
+/**
  * Implements hook_civicrm_managed().
  *
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_managed
@@ -120,7 +130,7 @@ function square_civicrm_postinstall(): void {
       'signature_label'=> 'Webhook Signature Key',
       'class_name'=> 'Payment_SquarePP',
       'url_site_default' => 'https://unused.org',
-      'url_api_default'=> 'https://connect.squareupsandbox.com',
+      'url_api_default'=> 'https://connect.squareup.com',
       'url_site_test_default' => 'https://unused.org',
       'url_api_test_default'=> 'https://connect.squareupsandbox.com',
       'billing_mode'=> 4,
@@ -136,6 +146,32 @@ function square_civicrm_postinstall(): void {
 }
 
 /**
+ * Implements hook_civicrm_postCommit().
+ * 
+ * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_postCommit
+ * 
+ * hook_civicrm_postCommit($op, $objectName, $objectId, &$objectRef)
+ */
+function square_civicrm_postCommit(string $op, string $objectName, int $objectId, &$objectRef) {
+  Civi::log()->debug('square.php::postCommit hook op ' . print_r($op, true));
+  Civi::log()->debug('square.php::postCommit hook objectName ' . print_r($objectName, true));
+  Civi::log()->debug('square.php::postCommit hook objectId ' . print_r($objectId, true));
+
+  if ($objectName == 'PaymentProcessor' && $op == 'create') {
+    if ($objectRef->class_name == 'Payment_SquarePP') {
+      if(!$objectRef->is_test) {
+        Civi::log()->debug('square.php::postCommit hook objectRef ' . print_r($objectRef, true));
+        Civi::log()->debug('square.php::postCommit hook objectRef class_name ' . print_r($objectRef->class_name, true));
+        // Test for webhook presence
+        $paymentProcessors = get_object_vars($objectRef);
+        CRM_Square_Webhook::myUpdateWebhookSubscription($paymentProcessors);
+        // Test for syncing Square Id with contact
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_civicrm_postIPNProcess().
  *
  * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_postIPNProcess
@@ -146,7 +182,7 @@ function square_civicrm_postIPNProcess(&$IPNData) {
     $customParams = json_decode($IPNData['custom'], TRUE);
     if (!empty($customParams['gaid'])) {
       Civi::log()->debug('square.php::postIPNProcess hook json decode' . '  ' . print_r($customParams["gaid"], true));
-      // trigger GA event id for e-commerce tracking.
+      // do something
     }
   }
 }
@@ -159,10 +195,10 @@ function square_civicrm_postIPNProcess(&$IPNData) {
  * @param string $formName
  * @param CRM_Core_Form $form
  */
-function square_civicrm_postProcess($formName, $form) {
+//function square_civicrm_postProcess($formName, $form) {
   // Civi::log()->debug('square.php::postProcess hook formName' . '  ' . print_r($formName, true));
   // Civi::log()->debug('square.php::postProcess hook form' . '  ' . print_r($form, true));  
-}
+//}
 
 /**
  * Implements hook_civicrm_alterContent().
@@ -196,11 +232,12 @@ function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
     else {
       if($tplName == "CRM/Financial/Form/Payment.tpl") {
         Civi::log()->debug('squere.php::civicrm_alterContent Hook $content' . '  ' . print_r($content, true));
-  
+        // todo support other forms  
       }
     }
   }   
 }
+
 /**
  * Implements Closure::bind to access protected properties.
  * 
@@ -213,11 +250,4 @@ function square_civicrm_alterContent(&$content, $context, &$tplName, &$object) {
 
     return $value;
   };
-}
-
-/**
- * Implements hook_civicrm_check().
- */
-function square_civicrm_check(&$messages) {
-  CRM_Square_Webhook::check($messages);
 }

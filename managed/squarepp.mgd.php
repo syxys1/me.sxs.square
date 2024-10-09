@@ -20,7 +20,7 @@ return [
         'signature_label'=> 'Webhook Signature Key',
         'class_name' => 'Payment_SquarePP',
         'url_site_default' => 'https://unused.org',
-        'url_api_default'=> 'https://connect.squareupsandbox.com',
+        'url_api_default'=> 'https://connect.squareup.com',
         'url_site_test_default' => 'https://unused.org',
         'url_api_test_default'=> 'https://connect.squareupsandbox.com',
         'billing_mode' => 4,
