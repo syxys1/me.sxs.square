@@ -15,7 +15,7 @@ class CRM_Square_Utils {
   public static function connectToSquare(array $paymentProcessor)
   {
     Civi::log()->debug('CRM_Square_Utils::connectToSquare');
-    Civi::log()->debug('CRM_Square_Utils::connectToSquare paymentProcessor ' . print_r($paymentProcessor, true));
+    //Civi::log()->debug('CRM_Square_Utils::connectToSquare paymentProcessor ' . print_r($paymentProcessor, true));
     
     $env = $paymentProcessor['is_test'] ? Environment::SANDBOX : Environment::PRODUCTION;
     $client = SquareClientBuilder::init()
@@ -48,15 +48,15 @@ class CRM_Square_Utils {
       $locations = [];
       $locations = $result->getLocations();
       foreach ($locations as $var) {
-        Civi::log()->debug('squareUtils.php::myListLocations location id: ' . print_r($var->getId(),true));
-        Civi::log()->debug('squareUtils.php::myListLocations location name: ' . print_r($var->getName(),true));
+        Civi::log()->debug('CRM_Square_Utils::myListLocations location id: ' . print_r($var->getId(),true));
+        Civi::log()->debug('CRM_Square_Utils::myListLocations location name: ' . print_r($var->getName(),true));
         $address = [];
         $address = $var->getAddress();
-        Civi::log()->debug('squareUtils.php::myListLocations location address: ' . print_r($address,true));
+        Civi::log()->debug('CRM_Square_Utils::myListLocations location address: ' . print_r($address,true));
         foreach ($address as $var2) {
-          Civi::log()->debug('squareUtils.php::myListLocations location address line 1: ' . print_r($var2->getAddressLine1(),true));
-          Civi::log()->debug('squareUtils.php::myListLocations location address line 2: ' . print_r($var2->getAddressLine2(),true));
-          Civi::log()->debug('squareUtils.php::myListLocations location address locality: ' . print_r($var2->getLocality(),true));
+          Civi::log()->debug('CRM_Square_Utils::myListLocations location address line 1: ' . print_r($var2->getAddressLine1(),true));
+          Civi::log()->debug('CRM_Square_Utils::myListLocations location address line 2: ' . print_r($var2->getAddressLine2(),true));
+          Civi::log()->debug('CRM_Square_Utils::myListLocations location address locality: ' . print_r($var2->getLocality(),true));
         }
       }
     }
@@ -72,7 +72,7 @@ class CRM_Square_Utils {
    */
   public static function myListLocationsIds($locations)
   {
-    Civi::log()->debug('squareUtils.php::myListLocationsIds');
+    Civi::log()->debug('CRM_Square_Utils::myListLocationsIds');
     $locationsIds = [];
     foreach ($locations as $var) {
       $locationsIds[] = $var->getId();
@@ -110,8 +110,7 @@ class CRM_Square_Utils {
 
       if ($apiResponse->isSuccess()) {
         $customer = $apiResponse->getResult();
-        Civi::log()->debug('CRM_Square_Utils::myCreateCustomer result ' . print_r($customer, true));
-        Civi::log()->debug('CRM_Square_Utils::myCreateCustomer customer id ' . print_r($customer->getCustomer()->getId(), true));
+        Civi::log()->debug('CRM_Square_Utils::myCreateCustomer customer ' . print_r($customer, true));
       } else {
         $errors = $apiResponse->getErrors();
         foreach ($errors as $error) {
@@ -128,8 +127,7 @@ class CRM_Square_Utils {
               print_r($e->getMessage(), true));
     }
     return $customer;
-}
-
+  }
 
 
   /**
@@ -137,7 +135,7 @@ class CRM_Square_Utils {
    */
   public static function myPrepareOrderBody($paymentProcessor, $requestFields, $customer)
   {
-    Civi::log()->debug('squareUtils.php::myPrepareOrderBody');
+    Civi::log()->debug('CRM_Square_Utils::myPrepareOrderBody');
     $client = self::connectToSquare($paymentProcessor);
 
     $order_line_item_applied_tax = new \Square\Models\OrderLineItemAppliedTax($requestFields['line_item_tax']);
@@ -156,7 +154,7 @@ class CRM_Square_Utils {
       $order_line_item->setName($requestFields['line_item_name']);
     }
 
-    Civi::log()->debug('squareUtils.php::myPrepareOrderBody ' . print_r(strlen($requestFields['line_item_note'])));
+    Civi::log()->debug('CRM_Square_Utils::myPrepareOrderBody line_item_note ' . print_r(strlen($requestFields['line_item_note'])));
     $order_line_item->setNote($requestFields['line_item_note']);
     $order_line_item->setItemType($requestFields['line_item_type']);
 
@@ -200,49 +198,49 @@ class CRM_Square_Utils {
    */
   public static function myCreateOrder($paymentProcessor, $body)
   {
-      Civi::log()->debug('squareUtils.php::myCreateOrder');
-      Civi::log()->debug('squareUtils.php::myCreateOrder body ' . print_r($body, true));
+      Civi::log()->debug('CRM_Square_Utils::myCreateOrder');
+      Civi::log()->debug('CRM_Square_Utils::myCreateOrder body ' . print_r($body, true));
       
       $client = self::connectToSquare($paymentProcessor);
       try {
           $apiResponse = $client->getOrdersApi()->createOrder($body);
           if ($apiResponse->isSuccess()) {
               $result = $apiResponse->getResult();
-              //Civi::log()->debug('squareUtils.php::myCreateOrder result ' . print_r($result,true));
+              //Civi::log()->debug('CRM_Square_Utils::myCreateOrder result ' . print_r($result,true));
   
               $orders = [];
               $orders = $result->getOrder();
-              Civi::log()->debug('squareUtils.php::myCreateOrder orders ' . print_r($orders,true));
+              Civi::log()->debug('CRM_Square_Utils::myCreateOrder orders ' . print_r($orders,true));
    
               foreach ($orders as $var) {
-                  Civi::log()->debug('squareUtils.php::myCreateOrder order id : ' . print_r($var->getId(),true));
-                  Civi::log()->debug('squareUtils.php::myCreateOrder order location id : ' . print_r($var->getLocationId(),true));
-                  Civi::log()->debug('squareUtils.php::myCreateOrder order customer id : ' . print_r($var->getCustomerId(),true));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder order id : ' . print_r($var->getId(),true));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder order location id : ' . print_r($var->getLocationId(),true));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder order customer id : ' . print_r($var->getCustomerId(),true));
                   $registeredLineItem = $var->getLineItems();
-                  Civi::log()->debug('squareUtils.php::myCreateOrder line items : ' . print_r($registeredLineItem,true));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder line items : ' . print_r($registeredLineItem,true));
                   foreach ($registeredLineItem as $var2) {
-                      Civi::log()->debug('squareUtils.php::myCreateOrder line item uid : ' . print_r($var2->getUid(),true));
-                      Civi::log()->debug('squareUtils.php::myCreateOrder line item name : ' . print_r($var2->getName(),true));
-                      Civi::log()->debug('squareUtils.php::myCreateOrder line item quantity : ' . print_r($var2->getQuantity(),true));
-                      Civi::log()->debug('squareUtils.php::myCreateOrder line item base price amount : ' . print_r($var2->getBasePriceMoney()->getAmount(),true));
-                      Civi::log()->debug('squareUtils.php::myCreateOrder line item base price currency : ' . print_r($var2->getBasePriceMoney()->getCurrency(),true));
-                      Civi::log()->debug('squareUtils.php::myCreateOrder line item type : ' . print_r($var2->getItemType(),true));
+                      Civi::log()->debug('CRM_Square_Utils::myCreateOrder line item uid : ' . print_r($var2->getUid(),true));
+                      Civi::log()->debug('CRM_Square_Utils::myCreateOrder line item name : ' . print_r($var2->getName(),true));
+                      Civi::log()->debug('CRM_Square_Utils::myCreateOrder line item quantity : ' . print_r($var2->getQuantity(),true));
+                      Civi::log()->debug('CRM_Square_Utils::myCreateOrder line item base price amount : ' . print_r($var2->getBasePriceMoney()->getAmount(),true));
+                      Civi::log()->debug('CRM_Square_Utils::myCreateOrder line item base price currency : ' . print_r($var2->getBasePriceMoney()->getCurrency(),true));
+                      Civi::log()->debug('CRM_Square_Utils::myCreateOrder line item type : ' . print_r($var2->getItemType(),true));
                   }
-                  Civi::log()->debug('squareUtils.php::myCreateOrder order total money : ' . print_r($var->getTotalMoney(),true));
-                  Civi::log()->debug('squareUtils.php::myCreateOrder order total money amount : ' . print_r($var->getTotalMoney()->getAmount()));
-                  Civi::log()->debug('squareUtils.php::myCreateOrder order total money currency : ' . print_r($var->getTotalMoney()->getCurrency()));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder order total money : ' . print_r($var->getTotalMoney(),true));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder order total money amount : ' . print_r($var->getTotalMoney()->getAmount()));
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder order total money currency : ' . print_r($var->getTotalMoney()->getCurrency()));
               }
           } else {
               $errors = $apiResponse->getErrors();
               foreach ($errors as $error) {
-                  Civi::log()->debug('squareUtils.php::myCreateOrder errors ' . 
+                  Civi::log()->debug('CRM_Square_Utils::myCreateOrder errors ' . 
                       print_r($error->getCategory(), true) . ' ' . 
                       print_r($error->getCode(), true) . ' ' .
                       print_r($error->getDetail(), true));
                   }
           }
       } catch (ApiException $e) {
-          Civi::log()->debug('squareUtils.php::myCreateOrder errors ApiException occurred: ' . 
+          Civi::log()->debug('CRM_Square_Utils::myCreateOrder errors ApiException occurred: ' . 
               print_r($e->getMessage(), true));
       }
 
@@ -255,7 +253,7 @@ class CRM_Square_Utils {
    */
   public static function myListOrders($client)
   {
-      Civi::log()->debug('squareUtils.php::myListOrders');
+      Civi::log()->debug('CRM_Square_Utils::myListOrders');
       $location_ids = [];
       $location_ids = self::myListLocationsIds(myListLocations($client));
 
@@ -302,14 +300,14 @@ class CRM_Square_Utils {
           } else {
               $errors = $apiResponse->getErrors();
               foreach ($errors as $error) {
-                  Civi::log()->debug('squareUtils.php::myListOrders errors ' . 
+                  Civi::log()->debug('CRM_Square_Utils::myListOrders errors ' . 
                       print_r($error->getCategory(), true) . ' ' . 
                       print_r($error->getCode(), true) . ' ' .
                       print_r($error->getDetail(), true));
                   }
           }
       } catch (ApiException $e) {
-          Civi::log()->debug('squareUtils.php::myListOrders errors ApiException occurred: ' . 
+          Civi::log()->debug('CRM_Square_Utils::myListOrders errors ApiException occurred: ' . 
               print_r($e->getMessage(), true));
       }
       return ($orderEntries);
@@ -320,8 +318,8 @@ class CRM_Square_Utils {
    */
   public static function myCreateInvoice($paymentProcessor, $orders)
   {
-      Civi::log()->debug('squareUtils.php::myCreateInvoice');
-      Civi::log()->debug('squareUtils.php::myCreateInvoice order date : ' . print_r(date('Y-m-d'), true));
+      Civi::log()->debug('CRM_Square_Utils::myCreateInvoice');
+      Civi::log()->debug('CRM_Square_Utils::myCreateInvoice order date : ' . print_r(date('Y-m-d'), true));
 
       $primary_recipient = new \Square\Models\InvoiceRecipient();
       $primary_recipient->setCustomerId($orders->getCustomerId());
@@ -355,20 +353,20 @@ class CRM_Square_Utils {
 
           if ($apiResponse->isSuccess()) {
               $invoice = $apiResponse->getResult();
-              Civi::log()->debug('squareUtils.php::myCreateInvoice $invoice : ' . print_r($invoice, true));
+              Civi::log()->debug('CRM_Square_Utils::myCreateInvoice $invoice : ' . print_r($invoice, true));
 
           } else {
               $invoice = null;
               $errors = $apiResponse->getErrors();
               foreach ($errors as $error) {
-                  Civi::log()->debug('squareUtils.php::myCreateInvoice errors ' . 
+                  Civi::log()->debug('CRM_Square_Utils::myCreateInvoice errors ' . 
                       print_r($error->getCategory(), true) . ' ' . 
                       print_r($error->getCode(), true) . ' ' .
                       print_r($error->getDetail(), true));
               }
           }
       } catch (ApiException $e) {
-          Civi::log()->debug('squareUtils.php::myCreateInvoice errors ApiException occurred: ' . 
+          Civi::log()->debug('CRM_Square_Utils::myCreateInvoice errors ApiException occurred: ' . 
               print_r($e->getMessage(), true));
       }
       return $invoice;
@@ -379,7 +377,7 @@ class CRM_Square_Utils {
    */
   public static function myPublishInvoice($paymentProcessor, $invoice)
   {
-    Civi::log()->debug('squareUtils.php::myPublishInvoice');
+    Civi::log()->debug('CRM_Square_Utils::myPublishInvoice');
     $client = self::connectToSquare($paymentProcessor);
 
     $publishRequest = new \Square\Models\PublishInvoiceRequest($invoice->getInvoice()->getVersion());
@@ -412,7 +410,7 @@ class CRM_Square_Utils {
    */
   public static function myListInvoice($client)
   {
-      Civi::log()->debug('squareUtils.php::myListInvoice');
+      Civi::log()->debug('CRM_Square_Utils::myListInvoice');
       try {
           $apiResponse = $client->getInvoicesApi()->listInvoices('L5PCE8REVXZN6');
 
@@ -495,14 +493,14 @@ class CRM_Square_Utils {
           } else {
               $errors = $apiResponse->getErrors();
               foreach ($errors as $error) {
-                  Civi::log()->debug('squareUtils.php::myListInvoice errors ' . 
+                  Civi::log()->debug('CRM_Square_Utils::myListInvoice errors ' . 
                       print_r($error->getCategory(), true) . ' ' . 
                       print_r($error->getCode(), true) . ' ' .
                       print_r($error->getDetail(), true));
               }
           }
       } catch (ApiException $e) {
-          Civi::log()->debug('squareUtils.php::myListInvoice errors ApiException occurred: ' . 
+          Civi::log()->debug('CRM_Square_Utils::myListInvoice errors ApiException occurred: ' . 
               print_r($e->getMessage(), true));
       }
   }
@@ -515,15 +513,15 @@ class CRM_Square_Utils {
    */
   public static function myPushInvoiceToSquare($paymentProcessor, $requestFields)
   {
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare');
+    Civi::log()->debug('CRM_Square_Utils::myPushInvoiceToSquare');
     $customer = self::myUpdateCustomer($paymentProcessor, $requestFields);
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $requestFields ' . print_r($requestFields, true));
+    //Civi::log()->debug('CRM_Square_Utils::myPushInvoiceToSquare $requestFields ' . print_r($requestFields, true));
     $body = self::myPrepareOrderBody($paymentProcessor, $requestFields, $customer);
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $body ' . print_r($body, true));
+    //Civi::log()->debug('CRM_Square_Utils::myPushInvoiceToSquare $body ' . print_r($body, true));
     $order = self::myCreateOrder($paymentProcessor, $body);
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $order ' . print_r($order, true));
+    //Civi::log()->debug('CRM_Square_Utils::myPushInvoiceToSquare $order ' . print_r($order, true));
     $invoice = self::myCreateInvoice($paymentProcessor, $order);
-    Civi::log()->debug('squareUtils.php::myPushInvoiceToSquare $invoice ' . print_r($invoice, true));
+    //Civi::log()->debug('CRM_Square_Utils::myPushInvoiceToSquare $invoice ' . print_r($invoice, true));
     self::myPublishInvoice($paymentProcessor, $invoice);
     return true;
   }
